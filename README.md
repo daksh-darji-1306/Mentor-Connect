@@ -2,10 +2,6 @@
 
 A modern, animated sign-up form for mentors and mentees, built with React, Tailwind CSS, Framer Motion, and Radix UI.
 
-## Demo
-
-![Mentor Connect UI](https://user-images.githubusercontent.com/your-demo-image.png)
-
 ## Features
 
 - Role toggle: Mentor or Mentee
