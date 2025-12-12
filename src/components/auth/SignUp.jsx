@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, ArrowLeft, Upload, Check, Briefcase, Globe, MapPin } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, ArrowLeft, Check, Briefcase, Globe, MapPin } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { countries } from '../../utils/countries';
 import { Button } from '../ui/button';
@@ -15,7 +15,6 @@ const SignUp = () => {
 
     const [step, setStep] = useState(1);
     const [role, setRole] = useState('mentor');
-    const [dragActive, setDragActive] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -98,15 +97,7 @@ const SignUp = () => {
         }
     };
 
-    const handleDrag = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else if (e.type === "dragleave") {
-            setDragActive(false);
-        }
-    };
+
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center bg-background relative overflow-hidden p-4 md:p-8">
@@ -350,24 +341,6 @@ const SignUp = () => {
                     {/* Step 2: Profile Info */}
                     {step === 2 && (
                         <div className="flex flex-col gap-6 animate-in slide-in-from-right-4 fade-in duration-300">
-                            {/* Photo Upload */}
-                            <div
-                                className={cn(
-                                    "border-2 border-dashed border-muted-foreground/30 rounded-2xl p-8 text-center cursor-pointer transition-all hover:border-primary/50 hover:bg-muted/30",
-                                    dragActive && "border-primary bg-primary/5"
-                                )}
-                                onDragEnter={handleDrag}
-                                onDragLeave={handleDrag}
-                                onDragOver={handleDrag}
-                                onDrop={handleDrag}
-                            >
-                                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground">
-                                    <Upload className="h-8 w-8" />
-                                </div>
-                                <p className="font-semibold text-foreground mb-1">Upload Profile Photo</p>
-                                <p className="text-sm text-muted-foreground">JPG, PNG or GIF (Max 2MB)</p>
-                            </div>
-
                             <div className="space-y-2">
                                 <Label>Professional Headline</Label>
                                 <div className="relative">
