@@ -8,8 +8,9 @@ import Testimonials from './components/Testimonials';
 import Footer from './components/Footer';
 import Pricing from './components/Pricing';
 
-import SignIn from './components/SignIn';
-import SignUp from './components/SignUp';
+import { AuthProvider } from './context/AuthContext';
+import SignIn from './components/auth/SignIn';
+import SignUp from './components/auth/SignUp';
 
 // Landing Page Wrapper
 const LandingPage = () => (
@@ -29,15 +30,17 @@ import SmoothScroll from './components/SmoothScroll';
 function App() {
   return (
     <Router>
-      <SmoothScroll>
-        <div className="App">
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
-          </Routes>
-        </div>
-      </SmoothScroll>
+      <AuthProvider>
+        <SmoothScroll>
+          <div className="App">
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<SignIn />} />
+              <Route path="/signup" element={<SignUp />} />
+            </Routes>
+          </div>
+        </SmoothScroll>
+      </AuthProvider>
     </Router>
   );
 }

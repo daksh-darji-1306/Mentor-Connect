@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Mail, Lock, User, ArrowRight, ArrowLeft, Upload, Check, Briefcase, Globe, MapPin } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { countries } from '../utils/countries';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Link, useNavigate } from 'react-router-dom';
+import { countries } from '../../utils/countries';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
-import GridPattern from './ui/grid-pattern';
+import GridPattern from '../ui/grid-pattern';
+import { useAuth } from '../../context/AuthContext';
 
 const SignUp = () => {
+    const navigate = useNavigate();
+    const { signupWithEmail } = useAuth();
+
     const [step, setStep] = useState(1);
     const [role, setRole] = useState('mentor');
     const [dragActive, setDragActive] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
@@ -44,6 +50,7 @@ const SignUp = () => {
         if (!formData.email.trim()) newErrors.email = "Email is required";
         else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
         if (!formData.password) newErrors.password = "Password is required";
+        if (formData.password.length < 6) newErrors.password = "Password must be at least 6 characters";
         if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Passwords do not match";
         if (!formData.country.trim()) newErrors.country = "Country is required";
         if (!formData.language.trim()) newErrors.language = "Language is required";
@@ -56,6 +63,38 @@ const SignUp = () => {
     const handleNext = () => {
         if (validateStep1()) {
             setStep(2);
+        }
+    };
+
+    const handleCompleteProfile = async () => {
+        setIsLoading(true);
+        try {
+            // Prepare data for Firestore
+            const profileData = {
+                fullName: formData.fullName,
+                role: role,
+                country: formData.country,
+                language: formData.language,
+                headline: formData.headline,
+                company: formData.company,
+                experience: formData.experience,
+                linkedin: formData.linkedin,
+                // Add any other fields you want to save
+            };
+
+            await signupWithEmail(formData.email, formData.password, profileData);
+            navigate('/'); // Redirect to home on success
+        } catch (error) {
+            console.error(error);
+            // Handle specific Firebase errors if needed
+            if (error.code === 'auth/email-already-in-use') {
+                setErrors(prev => ({ ...prev, email: 'Email is already registered' }));
+                setStep(1); // Go back to step 1 to show error
+            } else {
+                setErrors(prev => ({ ...prev, general: error.message }));
+            }
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -132,6 +171,11 @@ const SignUp = () => {
                         <p className="text-muted-foreground">
                             {step === 1 ? "Let's get your basics set up." : "Tell us about your professional journey."}
                         </p>
+                        {errors.general && (
+                            <div className="mt-4 p-3 bg-destructive/10 text-destructive rounded-md text-sm font-medium">
+                                {errors.general}
+                            </div>
+                        )}
                     </div>
 
                     {/* Step 1: Account Info */}
@@ -392,8 +436,8 @@ const SignUp = () => {
                                 <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
                                     <ArrowLeft className="mr-2 h-4 w-4" /> Back
                                 </Button>
-                                <Button className="flex-[2]">
-                                    Complete Profile
+                                <Button className="flex-[2]" onClick={handleCompleteProfile} disabled={isLoading}>
+                                    {isLoading ? 'Creating Account...' : 'Complete Profile'}
                                 </Button>
                             </div>
                         </div>
