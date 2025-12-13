@@ -8,6 +8,15 @@ import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
 import GridPattern from '../ui/grid-pattern';
 import { useAuth } from '../../context/AuthContext';
+import { X, Plus } from 'lucide-react';
+
+const COMMON_SKILLS = [
+    "Frontend Development", "Backend Development", "Full Stack", "Mobile Development",
+    "UI/UX Design", "Product Management", "System Design", "DevOps",
+    "Data Science", "Machine Learning", "Artificial Intelligence", "Cybersecurity",
+    "Cloud Computing", "Project Management", "Leadership", "Career Guidance",
+    "Resume Review", "Interview Prep", "JavaScript", "Python", "Java", "React", "Node.js"
+];
 
 const SignUp = () => {
     const navigate = useNavigate();
@@ -28,8 +37,11 @@ const SignUp = () => {
         headline: '',
         company: '',
         experience: '',
-        linkedin: ''
+        linkedin: '',
+        expertise: []
     });
+    const [expertiseInput, setExpertiseInput] = useState('');
+    const [showSkillSuggestions, setShowSkillSuggestions] = useState(false);
     const [errors, setErrors] = useState({});
 
     const handleChange = (e) => {
@@ -57,6 +69,33 @@ const SignUp = () => {
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
+    };
+
+    const handleAddSkill = (skill) => {
+        if (skill && !formData.expertise.includes(skill)) {
+            setFormData(prev => ({
+                ...prev,
+                expertise: [...prev.expertise, skill]
+            }));
+        }
+        setExpertiseInput('');
+        setShowSkillSuggestions(false);
+    };
+
+    const handleRemoveSkill = (skillToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            expertise: prev.expertise.filter(skill => skill !== skillToRemove)
+        }));
+    };
+
+    const handleSkillKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (expertiseInput.trim()) {
+                handleAddSkill(expertiseInput.trim());
+            }
+        }
     };
 
     const handleNext = () => {
@@ -377,16 +416,72 @@ const SignUp = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <Label className="mb-2 block">Areas of Expertise</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {['Frontend', 'Backend', 'System Design', 'Leadership', 'Product Management'].map(tag => (
-                                        <div key={tag} className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-xs font-medium border border-transparent hover:border-primary/30 cursor-pointer transition-all">
-                                            {tag}
+                            <div className="space-y-3">
+                                <Label>Areas of Expertise <span className="text-muted-foreground text-xs font-normal ml-1">(Select or type to add custom)</span></Label>
+
+                                <div className="space-y-3">
+                                    <div className="relative group">
+                                        <div className="relative">
+                                            <Briefcase className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                placeholder="Type a skill/topic (e.g. React, Leadership)..."
+                                                value={expertiseInput}
+                                                onChange={(e) => {
+                                                    setExpertiseInput(e.target.value);
+                                                    setShowSkillSuggestions(true);
+                                                }}
+                                                onKeyDown={handleSkillKeyDown}
+                                                onFocus={() => setShowSkillSuggestions(true)}
+                                                onBlur={() => setTimeout(() => setShowSkillSuggestions(false), 200)}
+                                                className="pl-9"
+                                            />
                                         </div>
-                                    ))}
-                                    <div className="border border-dashed border-primary/50 text-primary px-3 py-1 rounded-full text-xs font-medium cursor-pointer hover:bg-primary/5">
-                                        + Add Custom
+
+                                        {/* Suggestions Dropdown */}
+                                        {showSkillSuggestions && expertiseInput && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-popover border border-border rounded-md shadow-md z-50 animate-in fade-in zoom-in-95 duration-100">
+                                                {COMMON_SKILLS
+                                                    .filter(s => s.toLowerCase().includes(expertiseInput.toLowerCase()) && !formData.expertise.includes(s))
+                                                    .slice(0, 5) // Show top 5 matches
+                                                    .map(skill => (
+                                                        <div
+                                                            key={skill}
+                                                            onClick={() => handleAddSkill(skill)}
+                                                            className="px-4 py-2 hover:bg-muted cursor-pointer text-sm text-popover-foreground flex items-center justify-between group/item"
+                                                        >
+                                                            {skill}
+                                                            <Plus className="w-3 h-3 opacity-0 group-hover/item:opacity-100 transition-opacity text-primary" />
+                                                        </div>
+                                                    ))}
+                                                {/* Option to add what they typed as custom if it's not a direct match in the visible list */}
+                                                {!COMMON_SKILLS.some(s => s.toLowerCase() === expertiseInput.toLowerCase()) && (
+                                                    <div
+                                                        onClick={() => handleAddSkill(expertiseInput)}
+                                                        className="px-4 py-2 hover:bg-muted cursor-pointer text-sm text-primary font-medium border-t border-border flex items-center gap-2"
+                                                    >
+                                                        <Plus className="w-3 h-3" /> Add "{expertiseInput}"
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Selected Skills Tags */}
+                                    <div className="flex flex-wrap gap-2 min-h-[32px]">
+                                        {formData.expertise.map(skill => (
+                                            <div key={skill} className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1.5 animate-in zoom-in-50 duration-200">
+                                                {skill}
+                                                <button
+                                                    onClick={() => handleRemoveSkill(skill)}
+                                                    className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {formData.expertise.length === 0 && (
+                                            <span className="text-muted-foreground text-sm italic py-1.5">No skills added yet.</span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
