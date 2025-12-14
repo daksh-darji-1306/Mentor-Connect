@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import GridPattern from '../ui/grid-pattern';
 import { useAuth } from '../../context/AuthContext';
 import { X, Plus } from 'lucide-react';
+import PageTransition from '../layout/PageTransition';
 
 const COMMON_SKILLS = [
     "Frontend Development", "Backend Development", "Full Stack", "Mobile Development",
@@ -139,7 +140,7 @@ const SignUp = () => {
 
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-background relative overflow-hidden p-4 md:p-8">
+        <PageTransition className="min-h-screen w-full flex items-center justify-center bg-background relative overflow-hidden p-4 md:p-8">
             <GridPattern
                 width={40}
                 height={40}
@@ -167,7 +168,7 @@ const SignUp = () => {
                         <div className="space-y-4">
                             {[
                                 "Join 5,000+ professionals",
-                                role === 'mentor' ? "Earn doing what you love" : "Get personalized roadmaps",
+                                "Earn doing what you love",
                                 "Verified community"
                             ].map((text, i) => (
                                 <div key={i} className="flex items-center gap-4">
@@ -512,7 +513,7 @@ const SignUp = () => {
                     )}
                 </div>
             </div>
-        </div>
+        </PageTransition>
     );
 };
 

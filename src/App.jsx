@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { getPreference } from './utils/cookieManager';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -30,6 +31,24 @@ const LandingPage = () => (
 
 import SmoothScroll from './components/SmoothScroll';
 
+// Separated for useLocation() access
+const AnimatedRoutes = () => {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<DashboardHome />} />
+        </Route>
+      </Routes>
+    </AnimatePresence>
+  );
+};
+
 function App() {
   useEffect(() => {
     // Global Theme Initialization
@@ -45,14 +64,7 @@ function App() {
     <Router>
       <AuthProvider>
         <div className="App">
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/dashboard" element={<DashboardLayout />}>
-              <Route index element={<DashboardHome />} />
-            </Route>
-          </Routes>
+          <AnimatedRoutes />
         </div>
       </AuthProvider>
     </Router>
