@@ -121,7 +121,7 @@ const SignUp = () => {
             };
 
             await signupWithEmail(formData.email, formData.password, profileData);
-            navigate('/'); // Redirect to home on success
+            navigate('/dashboard'); // Redirect to dashboard on success
         } catch (error) {
             console.error(error);
             // Handle specific Firebase errors if needed

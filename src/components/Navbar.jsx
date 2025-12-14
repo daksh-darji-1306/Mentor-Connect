@@ -1,11 +1,35 @@
-import React, { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Menu, X, Sun, Moon } from 'lucide-react';
+import { setPreference, getPreference } from '../utils/cookieManager';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const [theme, setTheme] = useState('dark');
+
+    useEffect(() => {
+        const savedTheme = getPreference('theme') || 'dark';
+        setTheme(savedTheme);
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, []);
+
+    const toggleTheme = () => {
+        const newTheme = theme === 'light' ? 'dark' : 'light';
+        setTheme(newTheme);
+        setPreference('theme', newTheme);
+
+        if (newTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    };
 
     return (
         <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
@@ -34,6 +58,9 @@ const Navbar = () => {
                     </a>
 
                     <div className="flex items-center gap-4 ml-4">
+                        <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
+                            {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                        </Button>
                         <Link to="/login">
                             <Button variant="ghost" className="text-lg font-medium">Log In</Button>
                         </Link>
@@ -57,6 +84,12 @@ const Navbar = () => {
             {/* Mobile Menu */}
             {isOpen && (
                 <div className="md:hidden border-t border-border/40 bg-background p-4 shadow-xl">
+                    <div className="flex justify-between items-center px-2 pb-4">
+                        <span className="text-sm font-medium text-muted-foreground">Theme</span>
+                        <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
+                            {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                        </Button>
+                    </div>
                     <div className="flex flex-col space-y-4">
                         <a
                             href="#features"

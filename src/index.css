@@ -4,10 +4,56 @@
 
 @layer base {
   :root {
-    /* Defaulting to the requested Dark Theme even in :root for now, or we can make .dark the default */
-    /* Using HSL values for compatibility with Tailwind's opacity modifiers if needed, 
-       but direct hex is fine if we update tailwind config to use these vars directly without <alpha-value>.
-       For standard Shadcn, we usually use HSL. I will convert the requested Hex to HSL approx. */
+    /* Refined Light Mode (Premium/Clean) */
+
+    /* Background: Very subtle cool gray/white, less harsh than pure white */
+    /* Slate 50: #f8fafc -> 210 40% 98% */
+    --background: 210 40% 98%;
+
+    /* Main Text: Deep Slate for high contrast but softer than black */
+    /* Slate 900: #0f172a -> 222 47% 11% */
+    --foreground: 222 47% 11%;
+
+    /* Cards: Pure White to pop against the subtle background */
+    --card: 0 0% 100%;
+    /* Card Text: Slate 700 for slightly softer secondary text */
+    --card-foreground: 215 25% 27%;
+
+    /* Popover: Pure White */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary: Deep Violet/Indigo that looks professional on light */
+    /* Using a slightly deeper shade than the dark mode neon */
+    /* #7c3aed (Violet 600) -> 262 83% 58% */
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+
+    /* Secondary: Subtle Warmth or Neutral */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11%;
+
+    /* Muted: Subtle dividers and backgrounds */
+    --muted: 210 40% 90%;
+    --muted-foreground: 215 16% 47%;
+
+    /* Accent: For hover states, light indigo/blue tint */
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262 83% 58%;
+
+    --radius: 0.75rem;
+    /* Increased radius for modern feel */
+  }
+
+  .dark {
+    /* Original Dark Theme values */
 
     /* #0F1115 -> 220 18% 7% */
     --background: 220 18% 7%;
@@ -27,59 +73,22 @@
     /* Soft Violet: #A889FF -> 256 100% 77% */
     --primary: 256 100% 77%;
     --primary-foreground: 220 18% 7%;
-    /* Dark text on bright violet */
 
     /* Warm Gold: #D4B48C -> 34 41% 69% */
     --secondary: 34 41% 69%;
     --secondary-foreground: 220 18% 7%;
 
     /* Muted: #8C8F93 -> 210 3% 56% */
-    --muted: 210 3% 56%;
+    --muted: 220 18% 13%;
     --muted-foreground: 210 3% 56%;
 
     /* Electric Blue: #67C7FF -> 202 100% 70% */
-    --accent: 202 100% 70%;
-    --accent-foreground: 220 18% 7%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    /* Surface 1/2 border roughly */
-    --border: 220 18% 20%;
-    --input: 220 18% 20%;
-    --ring: 256 100% 77%;
-    /* Primary ring */
-
-    --radius: 0.5rem;
-
-    /* Custom Variables for hex usage if needed */
-    --color-main-bg: #0F1115;
-    --color-surface-1: #15181E;
-    --color-surface-2: #1B1F27;
-    --color-violet: #A889FF;
-    --color-gold: #D4B48C;
-    --color-blue: #67C7FF;
-  }
-
-  /* Ensuring dark mode class uses the same because this IS the theme now */
-  .dark {
-    --background: 220 18% 7%;
-    --foreground: 0 0% 100%;
-    --card: 220 18% 13%;
-    --card-foreground: 210 2% 78%;
-    --popover: 220 18% 10%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 256 100% 77%;
-    --primary-foreground: 220 18% 7%;
-    --secondary: 34 41% 69%;
-    --secondary-foreground: 220 18% 7%;
-    --muted: 220 18% 13%;
-    /* Use surface 2 for muted backgrounds sometimes */
-    --muted-foreground: 210 3% 56%;
     --accent: 220 18% 13%;
     --accent-foreground: 0 0% 100%;
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+
     --border: 220 18% 20%;
     --input: 220 18% 20%;
     --ring: 256 100% 77%;

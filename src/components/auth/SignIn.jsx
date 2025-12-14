@@ -9,6 +9,9 @@ import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
 import GridPattern from '../ui/grid-pattern';
 
+import { getDoc, doc, setDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+
 export default function SignIn() {
     const { loginWithGoogle, loginWithLinkedIn, loginWithEmail } = useAuth();
     const [error, setError] = useState('');
@@ -40,7 +43,7 @@ export default function SignIn() {
             if (cookieConsent) {
                 setPreference('last_login_method', 'email');
             }
-            navigate('/');
+            navigate('/dashboard');
         } catch (err) {
             setError(err.message.replace('Firebase:', '').replace('auth/', ''));
         }
@@ -53,7 +56,7 @@ export default function SignIn() {
             if (cookieConsent) {
                 setPreference('last_login_method', 'google');
             }
-            navigate('/');
+            navigate('/dashboard');
         } catch (err) {
             setError('Failed to sign in with Google');
             console.error(err);
@@ -67,7 +70,7 @@ export default function SignIn() {
             if (cookieConsent) {
                 setPreference('last_login_method', 'linkedin');
             }
-            navigate('/');
+            navigate('/dashboard');
         } catch (err) {
             setError('Failed to sign in with LinkedIn');
             console.error(err);
@@ -130,6 +133,68 @@ export default function SignIn() {
 
                     <div className="mb-8">
                         <h2 className="text-3xl font-bold mb-2">Sign In</h2>
+                        <button
+                            onClick={async (e) => {
+                                e.preventDefault();
+                                console.clear();
+                                alert("Starting Comprehensive Diagnostics...");
+
+                                // Initialize auth here for the diagnostic button
+                                const auth = getAuth();
+
+                                // 1. Check Internet
+                                console.log("DIAG: Checking Online Status:", navigator.onLine);
+                                if (!navigator.onLine) {
+                                    alert("❌ Browser says you are OFFLINE.");
+                                    return;
+                                }
+
+                                // 2. Check Config
+                                const projectId = auth.app.options.projectId;
+                                console.log("DIAG: Checking Firebase Config...", projectId);
+                                if (!projectId) {
+                                    alert("❌ MISSING PROJECT ID from config.");
+                                    return;
+                                }
+
+                                try {
+                                    // 3. Attempt simple Auth fetch (Read-only)
+                                    console.log("DIAG: Attempting Auth Fetch...");
+                                    await auth.updateCurrentUser(auth.currentUser);
+                                    console.log("DIAG: Auth Service Reachable.");
+
+                                    // 4. Attempt DB Write
+                                    console.log("DIAG: Attempting DB Write (Long Polling)...");
+                                    const testRef = doc(db, "test_collection", "connection_test_" + Date.now());
+
+                                    const writePromise = setDoc(testRef, {
+                                        status: "online",
+                                        userAgent: navigator.userAgent,
+                                        timestamp: new Date()
+                                    });
+
+                                    const timeoutPromise = new Promise((_, reject) =>
+                                        setTimeout(() => reject(new Error("DB_TIMEOUT_5S")), 5000)
+                                    );
+
+                                    await Promise.race([writePromise, timeoutPromise]);
+
+                                    alert("✅ SUCCESS! Connected to Firebase Database.");
+                                } catch (err) {
+                                    console.error("DIAG FAILURE:", err);
+                                    if (err.message === "DB_TIMEOUT_5S") {
+                                        alert(`❌ Database TIMEOUT (${projectId}). \nFirewall/Proxy likely blocking the connection.\nOr Project ID does not exist.`);
+                                    } else if (err.code === "permission-denied") {
+                                        alert("⚠️ CONNECTED but Permission Denied.\nDatabase is reachable, but rules block writes. This is GOOD (Network works).");
+                                    } else {
+                                        alert(`❌ ERROR: ${err.message}`);
+                                    }
+                                }
+                            }}
+                            className="bg-blue-600 text-white font-bold text-sm px-4 py-3 rounded mb-4 z-50 relative shadow-xl hover:bg-blue-700 w-full"
+                        >
+                            [DEBUG] Run Connection Diagnostics
+                        </button>
                         <p className="text-muted-foreground">Enter your credentials to access your account.</p>
 
                         {error && (

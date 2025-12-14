@@ -1,13 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, OAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 // Your web app's Firebase configuration
-// For technical security, these should be in a .env file
-// VITE_FIREBASE_API_KEY
-// VITE_FIREBASE_AUTH_DOMAIN
-// VITE_FIREBASE_PROJECT_ID
-// ... etc
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -20,10 +15,17 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// Use initializeFirestore with settings to force long polling (bypasses firewalls/proxies)
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
 
 // Auth Providers
 const googleProvider = new GoogleAuthProvider();
-const linkedinProvider = new OAuthProvider('oidc.linkedin'); // Or whatever provider ID you assigned in Firebase Console
+const linkedinProvider = new OAuthProvider('oidc.linkedin');
 
 export { auth, db, googleProvider, linkedinProvider };

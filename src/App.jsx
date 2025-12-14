@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { getPreference } from './utils/cookieManager';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Benefits from './components/Benefits';
@@ -11,10 +12,12 @@ import Pricing from './components/Pricing';
 import { AuthProvider } from './context/AuthContext';
 import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
+import DashboardLayout from './components/layout/DashboardLayout';
+import DashboardHome from './pages/DashboardHome';
 
 // Landing Page Wrapper
 const LandingPage = () => (
-  <>
+  <SmoothScroll>
     <Navbar />
     <Hero />
     <Benefits />
@@ -22,24 +25,35 @@ const LandingPage = () => (
     <Testimonials />
     <Pricing />
     <Footer />
-  </>
+  </SmoothScroll>
 );
 
 import SmoothScroll from './components/SmoothScroll';
 
 function App() {
+  useEffect(() => {
+    // Global Theme Initialization
+    const savedTheme = getPreference('theme') || 'dark';
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
   return (
     <Router>
       <AuthProvider>
-        <SmoothScroll>
-          <div className="App">
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<SignIn />} />
-              <Route path="/signup" element={<SignUp />} />
-            </Routes>
-          </div>
-        </SmoothScroll>
+        <div className="App">
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<SignIn />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/dashboard" element={<DashboardLayout />}>
+              <Route index element={<DashboardHome />} />
+            </Route>
+          </Routes>
+        </div>
       </AuthProvider>
     </Router>
   );

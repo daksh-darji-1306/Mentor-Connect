@@ -8,39 +8,51 @@ export default {
     theme: {
         extend: {
             colors: {
-                border: "hsl(var(--border))",
-                input: "hsl(var(--input))",
-                ring: "hsl(var(--ring))",
-                background: "hsl(var(--background))",
-                foreground: "hsl(var(--foreground))",
+                border: "hsl(var(--border) / <alpha-value>)",
+                input: "hsl(var(--input) / <alpha-value>)",
+                ring: "hsl(var(--ring) / <alpha-value>)",
+                background: "hsl(var(--background) / <alpha-value>)",
+                foreground: "hsl(var(--foreground) / <alpha-value>)",
                 primary: {
-                    DEFAULT: "hsl(var(--primary))",
-                    foreground: "hsl(var(--primary-foreground))",
+                    DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+                    foreground: "hsl(var(--primary-foreground) / <alpha-value>)",
                 },
                 secondary: {
-                    DEFAULT: "hsl(var(--secondary))",
-                    foreground: "hsl(var(--secondary-foreground))",
+                    DEFAULT: "hsl(var(--secondary) / <alpha-value>)",
+                    foreground: "hsl(var(--secondary-foreground) / <alpha-value>)",
                 },
                 destructive: {
-                    DEFAULT: "hsl(var(--destructive))",
-                    foreground: "hsl(var(--destructive-foreground))",
+                    DEFAULT: "hsl(var(--destructive) / <alpha-value>)",
+                    foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
                 },
                 muted: {
-                    DEFAULT: "hsl(var(--muted))",
-                    foreground: "hsl(var(--muted-foreground))",
+                    DEFAULT: "hsl(var(--muted) / <alpha-value>)",
+                    foreground: "hsl(var(--muted-foreground) / <alpha-value>)",
                 },
                 accent: {
-                    DEFAULT: "hsl(var(--accent))",
-                    foreground: "hsl(var(--accent-foreground))",
+                    DEFAULT: "hsl(var(--accent) / <alpha-value>)",
+                    foreground: "hsl(var(--accent-foreground) / <alpha-value>)",
                 },
                 popover: {
-                    DEFAULT: "hsl(var(--popover))",
-                    foreground: "hsl(var(--popover-foreground))",
+                    DEFAULT: "hsl(var(--popover) / <alpha-value>)",
+                    foreground: "hsl(var(--popover-foreground) / <alpha-value>)",
                 },
                 card: {
-                    DEFAULT: "hsl(var(--card))",
-                    foreground: "hsl(var(--card-foreground))",
+                    DEFAULT: "hsl(var(--card) / <alpha-value>)",
+                    foreground: "hsl(var(--card-foreground) / <alpha-value>)",
                 },
+                // Refined Purple Dashboard Theme
+                dashboard: {
+                    bg: "#0f172a", // Slate 900
+                    card: "#1e293b", // Slate 800
+                    cardHover: "#334155", // Slate 700
+                    text: "#f8fafc", // Slate 50
+                    textMuted: "#94a3b8", // Slate 400
+                    accent: "#6366f1", // Indigo 500
+                    accentHover: "#4f46e5", // Indigo 600
+                    accentGlow: "#818cf8", // Indigo 400
+                    border: "#334155", // Slate 700
+                }
             },
             borderRadius: {
                 lg: "var(--radius)",

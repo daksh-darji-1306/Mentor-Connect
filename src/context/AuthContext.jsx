@@ -22,26 +22,31 @@ export const AuthProvider = ({ children }) => {
     const syncUserToFirestore = async (user, additionalData = {}) => {
         if (!user) return;
 
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
+        try {
+            const userRef = doc(db, 'users', user.uid);
+            const userSnap = await getDoc(userRef);
 
-        // If user doesn't exist, create them
-        if (!userSnap.exists()) {
-            await setDoc(userRef, {
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName || additionalData.displayName || '',
-                photoURL: user.photoURL || '',
-                role: additionalData.role || 'mentee', // Default to mentee if not specified
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-                provider: user.providerData[0]?.providerId || 'email'
-            });
-        } else {
-            // Just update last login
-            await setDoc(userRef, {
-                lastLogin: serverTimestamp()
-            }, { merge: true });
+            // If user doesn't exist, create them
+            if (!userSnap.exists()) {
+                await setDoc(userRef, {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName || additionalData.displayName || '',
+                    photoURL: user.photoURL || '',
+                    role: additionalData.role || 'mentee', // Default to mentee if not specified
+                    createdAt: serverTimestamp(),
+                    lastLogin: serverTimestamp(),
+                    provider: user.providerData[0]?.providerId || 'email'
+                });
+            } else {
+                // Just update last login
+                await setDoc(userRef, {
+                    lastLogin: serverTimestamp()
+                }, { merge: true });
+            }
+        } catch (error) {
+            console.error("Firestore Sync Error (Offline/Network):", error);
+            // Optionally: Persist locally or retry later
         }
     };
 
@@ -99,8 +104,29 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                try {
+                    // Fetch the role and additional data from Firestore
+                    const userRef = doc(db, 'users', currentUser.uid);
+                    const userSnap = await getDoc(userRef);
+
+                    if (userSnap.exists()) {
+                        const userData = userSnap.data();
+                        // Merge auth user with firestore data
+                        setUser({ ...currentUser, ...userData });
+                    } else {
+                        // Fallback if firestore doc is missing (rare)
+                        setUser(currentUser);
+                    }
+                } catch (error) {
+                    console.error("Error fetching user role (Offline/Network): Using Auth defaults", error);
+                    // Fallback to basic auth user if Firestore fails
+                    setUser(currentUser);
+                }
+            } else {
+                setUser(null);
+            }
             setLoading(false);
         });
 
