@@ -5,45 +5,44 @@ import { Button } from "@/components/ui/button";
 const Pricing = () => {
     const plans = [
         {
-            name: "Starter",
+            name: "Community",
             price: "Free",
-            description: "Perfect for exploring mentorship and getting started.",
+            description: "Good for browsing and occasional questions.",
             features: [
-                "Access to mentor directory",
-                "1 Mentor connection",
-                "Basic profile",
-                "Community support"
+                "Access to public Q&A",
+                "1 Group session / month",
+                "Community Discord access",
+                "Basic profile"
             ],
-            cta: "Get Started",
+            cta: "Join for Free",
             highlight: false
         },
         {
-            name: "Pro",
-            price: "₹6500",
+            name: "Mentorship",
+            price: "$199",
             period: "/month",
-            description: "Serious growth for serious professionals who want results.",
+            description: "The standard for serious career growth.",
             features: [
-                "Unlimited mentor connections",
-                "Priority messaging",
-                "Exclusive webinars",
-                "Verified badge",
-                "Career roadmap builder"
+                "2x 1:1 Video Calls / month",
+                "Unlimited Chat Support",
+                "Resume & Portfolio Review",
+                "Custom Growth Plan"
             ],
-            cta: "Go Pro",
+            cta: "Start 7-Day Trial",
             highlight: true
         },
         {
-            name: "Enterprise",
-            price: "Custom",
-            description: "Tailored solutions for teams and organizations.",
+            name: "Career Shift",
+            price: "$499",
+            period: "/month",
+            description: "Intensive support for switching roles or landing a new job.",
             features: [
-                "Custom mentor matching",
-                "Team dashboards",
-                "Analytics & reporting",
-                "Dedicated success manager",
-                "API access"
+                "Weekly 1:1 Video Calls",
+                "Mock Interviews",
+                "Direct Intro to Hiring Managers",
+                "Salary Negotiation Support"
             ],
-            cta: "Contact Sales",
+            cta: "Apply Now",
             highlight: false
         }
     ];
@@ -55,8 +54,8 @@ const Pricing = () => {
 
             <div className="container px-4 md:px-6 mx-auto">
                 <div className="text-center mb-16 max-w-3xl mx-auto">
-                    <h2 className="text-3xl md:text-5xl font-bold mb-4 tracking-tight text-foreground">Invest in Your Future</h2>
-                    <p className="text-lg text-muted-foreground">Choose the plan that fits your career goals and accelerate your growth with world-class mentorship.</p>
+                    <h2 className="text-3xl md:text-5xl font-bold mb-6 tracking-tight text-foreground">Transparent Pricing</h2>
+                    <p className="text-lg text-muted-foreground">No implementation fees. No long-term contracts. Just growth.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">

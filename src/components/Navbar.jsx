@@ -47,14 +47,17 @@ const Navbar = () => {
 
                 {/* Desktop Menu */}
                 <div className="hidden md:flex items-center gap-8">
-                    <a href="/#features" className="text-lg font-medium text-muted-foreground transition-colors hover:text-primary">
-                        Features
+                    <a href="/#features" className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary">
+                        Why
                     </a>
-                    <a href="/#how-it-works" className="text-lg font-medium text-muted-foreground transition-colors hover:text-primary">
+                    <a href="/#how-it-works" className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary">
                         How it Works
                     </a>
-                    <a href="/#testimonials" className="text-lg font-medium text-muted-foreground transition-colors hover:text-primary">
-                        Stories
+                    <a href="/#testimonials" className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary">
+                        Reviews
+                    </a>
+                    <a href="/#pricing" className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary">
+                        Pricing
                     </a>
 
                     <div className="flex items-center gap-4 ml-4">

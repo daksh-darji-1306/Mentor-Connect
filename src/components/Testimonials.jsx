@@ -7,31 +7,31 @@ const reviews = [
     {
         name: "James Ito",
         role: "Software Engineer",
-        body: "The structured micro-courses made it so easy to learn exactly what I needed without committing to a generic 3-month program. Adjusted my career path in weeks.",
+        body: "Adjusted my career path in weeks. No generic advice, just strategy.",
         img: "https://avatar.vercel.sh/james",
     },
     {
         name: "Elena Rodriguez",
         role: "UX Designer",
-        body: "I love the goal tracking feature. My mentor and I set clear milestones and checking them off gave me such a sense of progress. Highly recommended!",
+        body: "Checking off milestones gave me real momentum. Highly recommended.",
         img: "https://avatar.vercel.sh/elena",
     },
     {
         name: "Sarah Chen",
         role: "Product Manager",
-        body: "Finding a mentor who actually understood the fintech space was impossible until I found Mentor Connect. The match was instant.",
+        body: "The match was instant. Finally found someone who actually understands fintech.",
         img: "https://avatar.vercel.sh/sarah",
     },
     {
         name: "Michael Park",
         role: "Data Scientist",
-        body: "The platform's focus on tangible outcomes rather than just 'chats' changed how I view mentorship. I got a promotion within 6 months.",
+        body: "A promotion within 6 months. Tangible outcomes only.",
         img: "https://avatar.vercel.sh/michael",
     },
     {
         name: "David Kim",
         role: "Frontend Dev",
-        body: "Super clean UI and the 1:1 video sessions are flawless. It feels like a premium experience from start to finish.",
+        body: "Premium experience from start to finish. Worth every cent.",
         img: "https://avatar.vercel.sh/david",
     },
 ];
@@ -46,12 +46,11 @@ const ReviewCard = ({
         <figure
             className={cn(
                 "relative w-80 cursor-pointer overflow-hidden rounded-xl border p-6 mx-4",
-                // dark styles
-                "border-border/50 bg-card hover:bg-card/80 transition-colors shadow-soft",
+                "border-border/30 bg-card/50 hover:bg-card/80 transition-colors",
             )}
         >
-            <div className="flex flex-row items-center gap-2">
-                <img className="rounded-full" width="32" height="32" alt="" src={img} />
+            <div className="flex flex-row items-center gap-3">
+                <img className="rounded-full opacity-80" width="32" height="32" alt="" src={img} />
                 <div className="flex flex-col">
                     <figcaption className="text-sm font-medium text-foreground">
                         {name}
@@ -59,25 +58,20 @@ const ReviewCard = ({
                     <p className="text-xs font-medium text-muted-foreground">{role}</p>
                 </div>
             </div>
-            <blockquote className="mt-4 text-sm italic text-muted-foreground/90">"{body}"</blockquote>
-            <div className="flex gap-1 mt-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} size={14} className="fill-secondary text-secondary" />
-                ))}
-            </div>
+            <blockquote className="mt-4 text-sm text-foreground/80 leading-relaxed">"{body}"</blockquote>
         </figure>
     );
 };
 
 const Testimonials = () => {
     return (
-        <section id="testimonials" className="py-24 bg-background/50 relative">
-            <div className="container px-4 mx-auto mb-12 text-center">
-                <h2 className="text-3xl md:text-5xl font-bold tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70 mb-4">
-                    Success Stories
+        <section id="testimonials" className="py-24 bg-background relative border-y border-border/40">
+            <div className="container px-4 mx-auto mb-16 text-center">
+                <h2 className="text-3xl md:text-5xl font-bold tracking-tighter text-foreground mb-4">
+                    Real Feedback
                 </h2>
                 <p className="text-muted-foreground text-lg max-w-[600px] mx-auto">
-                    Join thousands of professionals who have accelerated their careers through Mentor Connect.
+                    No marketing noise. Just results.
                 </p>
             </div>
 

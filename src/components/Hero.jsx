@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 const Hero = () => {
     return (
-        <section className="relative overflow-hidden pt-20 pb-32 md:pt-32 md:pb-48">
+        <section className="relative overflow-hidden pt-12 pb-24 md:pt-24 md:pb-32">
             <GridPattern
                 width={30}
                 height={30}
@@ -23,41 +23,41 @@ const Hero = () => {
 
             <div className="container relative z-10 mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
                 <div className="flex flex-col items-start text-left space-y-6">
-                    <div className="inline-flex items-center gap-2 bg-secondary/50 border border-secondary text-secondary-foreground px-4 py-1.5 rounded-full text-sm font-semibold shadow-sm backdrop-blur-sm">
+                    <div className="inline-flex items-center gap-2 bg-secondary/30 border border-secondary/50 text-secondary-foreground px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm">
                         <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                         Trusted by 5,000+ Professionals
                     </div>
 
-                    <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight text-foreground">
-                        Find Your <br />
-                        <span className="text-primary inline-flex">
-                            <WordRotate
-                                words={["Perfect Mentor", "Ideal Guide", "Career Coach", "Future Growth"]}
-                                duration={3000}
-                                className="text-primary"
-                            />
-                        </span>
+                    <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.15] text-foreground max-w-4xl">
+                        Structured Career Mentorship <br className="hidden md:block" />
+                        From Verified Industry Experts
                     </h1>
 
-                    <p className="text-lg md:text-xl text-muted-foreground max-w-lg leading-relaxed">
-                        Connect with industry experts for structured guidance, micro-courses, and career-changing advice. No awkward reach-outs, just growth.
-                    </p>
-
-                    <div className="flex flex-wrap gap-4 pt-2">
-                        <Button size="lg" className="rounded-full px-8 text-base shadow-lg shadow-primary/20 transition-all hover:scale-105 hover:glow-primary">
-                            Find a Mentor <ArrowRight className="ml-2 h-5 w-5" />
-                        </Button>
-                        <Button variant="outline" size="lg" className="rounded-full px-8 text-base hover:bg-secondary/20 hover:text-secondary-foreground border-secondary/50">
-                            Become a Mentor
-                        </Button>
+                    <div className="text-2xl md:text-3xl font-semibold text-muted-foreground">
+                        <WordRotate
+                            words={["No cold DMs", "No generic advice", "Just real guidance", "Career clarity, faster"]}
+                            duration={2500}
+                            className="text-primary"
+                        />
                     </div>
 
-                    <div className="flex gap-6 pt-6 text-sm text-muted-foreground font-medium">
+                    <div className="flex flex-wrap gap-4 pt-4">
+                        <Button size="lg" className="rounded-full px-8 text-base shadow-sm hover:shadow-md transition-all">
+                            Find a Mentor
+                        </Button>
+                        <a href="/#how-it-works">
+                            <Button variant="ghost" size="lg" className="rounded-full px-8 text-base hover:bg-secondary/30">
+                                How it works
+                            </Button>
+                        </a>
+                    </div>
+
+                    <div className="flex gap-8 pt-6 text-sm text-muted-foreground/80 font-medium">
                         <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-primary" /> Verified Experts
                         </div>
                         <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-primary" /> Risk-Free Trial
+                            <CheckCircle className="h-4 w-4 text-primary" /> No Hidden Fees
                         </div>
                     </div>
                 </div>
