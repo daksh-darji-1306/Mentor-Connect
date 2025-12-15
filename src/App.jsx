@@ -15,6 +15,9 @@ import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardHome from './pages/DashboardHome';
+import MentorsPage from './pages/MentorsPage';
+import SessionsPage from './pages/SessionsPage';
+import MessagesPage from './pages/MessagesPage';
 
 // Landing Page Wrapper
 const LandingPage = () => (
@@ -41,8 +44,11 @@ const AnimatedRoutes = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route path="/dashboard" element={<DashboardLayout />}>
-          <Route index element={<DashboardHome />} />
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<DashboardHome />} />
+          <Route path="/mentors" element={<MentorsPage />} />
+          <Route path="/sessions" element={<SessionsPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
         </Route>
       </Routes>
     </AnimatePresence>
