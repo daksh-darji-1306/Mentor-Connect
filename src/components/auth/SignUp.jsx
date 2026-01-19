@@ -122,13 +122,13 @@ const SignUp = () => {
             };
 
             await signupWithEmail(formData.email, formData.password, profileData);
-            navigate('/dashboard'); // Redirect to dashboard on success
+            navigate('/onboarding'); // Redirect to onboarding
         } catch (error) {
             console.error(error);
             // Handle specific Firebase errors if needed
-            if (error.code === 'auth/email-already-in-use') {
+            if (error.message.includes('already registered') || error.message.includes('unique constraint')) {
                 setErrors(prev => ({ ...prev, email: 'Email is already registered' }));
-                setStep(1); // Go back to step 1 to show error
+                setStep(1);
             } else {
                 setErrors(prev => ({ ...prev, general: error.message }));
             }

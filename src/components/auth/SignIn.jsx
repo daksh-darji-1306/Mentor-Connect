@@ -45,7 +45,7 @@ export default function SignIn() {
             }
             navigate('/dashboard');
         } catch (err) {
-            setError(err.message.replace('Firebase:', '').replace('auth/', ''));
+            setError(err.message);
         }
     };
 

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const Navbar = () => {
+const Navbar = ({ onOpenWaitlist }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [theme, setTheme] = useState('dark');
 
@@ -67,9 +67,7 @@ const Navbar = () => {
                         <Link to="/login">
                             <Button variant="ghost" className="text-lg font-medium">Log In</Button>
                         </Link>
-                        <Link to="/signup">
-                            <Button className="text-lg font-medium shadow-md shadow-primary/20 hover:glow-primary transition-all px-6 py-5">Get Started</Button>
-                        </Link>
+                        <Button onClick={onOpenWaitlist} className="text-lg font-medium shadow-md shadow-primary/20 hover:glow-primary transition-all px-6 py-5">Join Waitlist</Button>
                     </div>
                 </div>
 
@@ -119,9 +117,7 @@ const Navbar = () => {
                             <Link to="/login" onClick={() => setIsOpen(false)}>
                                 <Button variant="outline" className="w-full justify-center text-lg">Log In</Button>
                             </Link>
-                            <Link to="/signup" onClick={() => setIsOpen(false)}>
-                                <Button className="w-full justify-center shadow-lg shadow-primary/20 text-lg py-6">Get Started</Button>
-                            </Link>
+                            <Button onClick={() => { setIsOpen(false); onOpenWaitlist(); }} className="w-full justify-center shadow-lg shadow-primary/20 text-lg py-6">Join Waitlist</Button>
                         </div>
                     </div>
                 </div>

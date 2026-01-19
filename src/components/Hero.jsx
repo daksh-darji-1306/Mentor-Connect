@@ -6,7 +6,7 @@ import GridPattern from './ui/grid-pattern';
 import heroImage from '../assets/hero-image.png';
 import { cn } from '@/lib/utils';
 
-const Hero = () => {
+const Hero = ({ onOpenWaitlist }) => {
     return (
         <section className="relative overflow-hidden pt-12 pb-24 md:pt-24 md:pb-32">
             <GridPattern
@@ -42,8 +42,8 @@ const Hero = () => {
                     </div>
 
                     <div className="flex flex-wrap gap-4 pt-4">
-                        <Button size="lg" className="rounded-full px-8 text-base shadow-sm hover:shadow-md transition-all">
-                            Find a Mentor
+                        <Button onClick={onOpenWaitlist} size="lg" className="rounded-full px-8 text-base shadow-sm hover:shadow-md transition-all">
+                            Join Waitlist
                         </Button>
                         <a href="/#how-it-works">
                             <Button variant="ghost" size="lg" className="rounded-full px-8 text-base hover:bg-secondary/30">
@@ -69,7 +69,7 @@ const Hero = () => {
 
                     <div className="relative rounded-2xl overflow-hidden shadow-2xl transition-transform duration-500 hover:rotate-y-2 hover:scale-[1.01] border border-border/50 bg-background/50 backdrop-blur-sm">
                         <img
-                            src={heroImage}
+                            src="/hero-image.png"
                             alt="Mentor and Mentee"
                             className="w-full h-auto object-cover transform transition-transform duration-700 hover:scale-105"
                         />

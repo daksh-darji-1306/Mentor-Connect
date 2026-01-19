@@ -19,7 +19,7 @@ const Pricing = () => {
         },
         {
             name: "Mentorship",
-            price: "$199",
+            price: "₹3,999",
             period: "/month",
             description: "The standard for serious career growth.",
             features: [
@@ -33,7 +33,7 @@ const Pricing = () => {
         },
         {
             name: "Career Shift",
-            price: "$499",
+            price: "₹9,999",
             period: "/month",
             description: "Intensive support for switching roles or landing a new job.",
             features: [

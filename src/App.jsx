@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { getPreference } from './utils/cookieManager';
@@ -9,7 +9,6 @@ import HowItWorks from './components/HowItWorks';
 import Testimonials from './components/Testimonials';
 import Footer from './components/Footer';
 import Pricing from './components/Pricing';
-
 import { AuthProvider } from './context/AuthContext';
 import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
@@ -18,21 +17,30 @@ import DashboardHome from './pages/DashboardHome';
 import MentorsPage from './pages/MentorsPage';
 import SessionsPage from './pages/SessionsPage';
 import MessagesPage from './pages/MessagesPage';
+import WaitlistModal from './components/WaitlistModal';
 
 // Landing Page Wrapper
-const LandingPage = () => (
-  <SmoothScroll>
-    <Navbar />
-    <Hero />
-    <Benefits />
-    <HowItWorks />
-    <Testimonials />
-    <Pricing />
-    <Footer />
-  </SmoothScroll>
-);
+
+const LandingPage = () => {
+  const [showWaitlist, setShowWaitlist] = useState(false);
+
+  return (
+    <SmoothScroll>
+      <Navbar onOpenWaitlist={() => setShowWaitlist(true)} />
+      <Hero onOpenWaitlist={() => setShowWaitlist(true)} />
+      <Benefits />
+      <HowItWorks />
+      <Testimonials />
+      <Pricing />
+      <Footer />
+      <WaitlistModal isOpen={showWaitlist} onClose={() => setShowWaitlist(false)} />
+    </SmoothScroll>
+  );
+};
 
 import SmoothScroll from './components/SmoothScroll';
+
+import Onboarding from './pages/Onboarding';
 
 // Separated for useLocation() access
 const AnimatedRoutes = () => {
@@ -44,6 +52,7 @@ const AnimatedRoutes = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/onboarding" element={<Onboarding />} />
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardHome />} />
           <Route path="/mentors" element={<MentorsPage />} />

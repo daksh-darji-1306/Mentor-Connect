@@ -1,14 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import {
-    signInWithPopup,
-    signOut,
-    onAuthStateChanged,
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    updateProfile
-} from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, googleProvider, linkedinProvider } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext();
 
@@ -18,119 +9,126 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Helper to sync user to Firestore on login/signup
-    const syncUserToFirestore = async (user, additionalData = {}) => {
-        if (!user) return;
-
+    const fetchProfile = async (authUser) => {
         try {
-            const userRef = doc(db, 'users', user.uid);
-            const userSnap = await getDoc(userRef);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', authUser.id)
+                .single();
 
-            // If user doesn't exist, create them
-            if (!userSnap.exists()) {
-                await setDoc(userRef, {
-                    uid: user.uid,
-                    email: user.email,
-                    displayName: user.displayName || additionalData.displayName || '',
-                    photoURL: user.photoURL || '',
-                    role: additionalData.role || 'mentee', // Default to mentee if not specified
-                    createdAt: serverTimestamp(),
-                    lastLogin: serverTimestamp(),
-                    provider: user.providerData[0]?.providerId || 'email'
-                });
+            if (data) {
+                setUser({ ...authUser, ...data });
             } else {
-                // Just update last login
-                await setDoc(userRef, {
-                    lastLogin: serverTimestamp()
-                }, { merge: true });
+                setUser(authUser);
             }
         } catch (error) {
-            console.error("Firestore Sync Error (Offline/Network):", error);
-            // Optionally: Persist locally or retry later
+            console.error("Error fetching profile:", error);
+            setUser(authUser);
+        } finally {
+            setLoading(false);
         }
     };
 
     const signupWithEmail = async (email, password, profileData) => {
-        try {
-            const result = await createUserWithEmailAndPassword(auth, email, password);
-            // Update the Firebase Auth profile with the name immediately
-            await updateProfile(result.user, { displayName: profileData.fullName });
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: profileData.fullName,
+                    role: profileData.role || 'mentee',
+                    avatar_url: ''
+                }
+            }
+        });
 
-            // Sync to Firestore with all profile data
-            await syncUserToFirestore(result.user, profileData);
-            return result.user;
-        } catch (error) {
-            console.error("Signup Error:", error);
-            throw error;
+        if (error) throw error;
+
+        // If signup is successful, we might want to update the profile with the full form data
+        // The trigger handles basic fields (id, name, role), but we have extra data in profileData
+        if (data.user) {
+            // Update the profile with the rich data (headline, company, etc.)
+            // We store this in the new 'profile_data' JSONB column for flexibility
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({
+                    profile_data: profileData,
+                    country: profileData.country,        // if you want explicit col
+                    language: profileData.language       // if you want explicit col
+                })
+                .eq('id', data.user.id);
+
+            if (updateError) console.error("Error updating profile details:", updateError);
+
+            // If session exists (auto-login enabled), fetch full profile
+            if (data.session) {
+                await fetchProfile(data.user);
+            }
         }
+
+        return data.user;
     };
 
     const loginWithEmail = async (email, password) => {
-        try {
-            const result = await signInWithEmailAndPassword(auth, email, password);
-            await syncUserToFirestore(result.user);
-            return result.user;
-        } catch (error) {
-            console.error("Login Error:", error);
-            throw error;
-        }
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        });
+        if (error) throw error;
+        return data.user;
     };
 
     const loginWithGoogle = async () => {
-        try {
-            const result = await signInWithPopup(auth, googleProvider);
-            // Google doesn't provide a role, so we rely on default or existing
-            await syncUserToFirestore(result.user);
-            return result.user;
-        } catch (error) {
-            console.error("Google Login Error:", error);
-            throw error;
-        }
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${window.location.origin}/dashboard`
+            }
+        });
+        if (error) throw error;
+        return data;
     };
 
     const loginWithLinkedIn = async () => {
-        try {
-            const result = await signInWithPopup(auth, linkedinProvider);
-            await syncUserToFirestore(result.user);
-            return result.user;
-        } catch (error) {
-            console.error("LinkedIn Login Error:", error);
-            throw error;
-        }
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'linkedin',
+            options: {
+                redirectTo: `${window.location.origin}/dashboard`
+            }
+        });
+        if (error) throw error;
+        return data;
     };
 
-    const logout = () => {
-        return signOut(auth);
+    const logout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        setUser(null);
     };
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                try {
-                    // Fetch the role and additional data from Firestore
-                    const userRef = doc(db, 'users', currentUser.uid);
-                    const userSnap = await getDoc(userRef);
-
-                    if (userSnap.exists()) {
-                        const userData = userSnap.data();
-                        // Merge auth user with firestore data
-                        setUser({ ...currentUser, ...userData });
-                    } else {
-                        // Fallback if firestore doc is missing (rare)
-                        setUser(currentUser);
-                    }
-                } catch (error) {
-                    console.error("Error fetching user role (Offline/Network): Using Auth defaults", error);
-                    // Fallback to basic auth user if Firestore fails
-                    setUser(currentUser);
-                }
+        // Initial Session Check
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                fetchProfile(session.user);
             } else {
                 setUser(null);
+                setLoading(false);
             }
-            setLoading(false);
         });
 
-        return () => unsubscribe();
+        // Listen for changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+                await fetchProfile(session.user);
+            } else {
+                setUser(null);
+                setLoading(false);
+            }
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     const value = {
