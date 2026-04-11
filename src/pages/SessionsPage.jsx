@@ -155,13 +155,24 @@ const SessionsPage = () => {
                                         <p className="text-xs text-muted-foreground">Day {session.day} | {session.time}</p>
                                     </div>
                                 </div>
-                                <Button 
-                                    className="w-full font-bold shadow-md hover:shadow-lg transition-all" 
-                                    size="sm"
-                                    onClick={() => window.open(session.link, '_blank')}
-                                >
-                                    View in Calendar
-                                </Button>
+                                {session.link ? (
+                                    <Button 
+                                        className="w-full font-bold shadow-md hover:shadow-lg transition-all" 
+                                        size="sm"
+                                        onClick={() => window.open(session.link, '_blank')}
+                                    >
+                                        View in Calendar
+                                    </Button>
+                                ) : (
+                                    <Button 
+                                        className="w-full font-bold shadow-md hover:shadow-lg transition-all" 
+                                        size="sm"
+                                        variant="outline"
+                                        disabled
+                                    >
+                                        No Link Available
+                                    </Button>
+                                )}
                             </div>
                         ))}
                     </div>

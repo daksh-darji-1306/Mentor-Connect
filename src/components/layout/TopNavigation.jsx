@@ -2,9 +2,11 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Bell, Search, Settings, User } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { useAuth } from '../context/AuthContext';
 
 const TopNavigation = () => {
     const location = useLocation();
+    const { user, toggleRole } = useAuth();
 
     const navItems = [
         { label: 'Dashboard', path: '/dashboard' },
@@ -53,6 +55,10 @@ const TopNavigation = () => {
                         />
                     </div>
 
+                    <Button variant="outline" size="sm" onClick={toggleRole} className="hidden sm:flex h-8 bg-secondary/50 text-xs font-semibold">
+                        View as {user?.role === 'mentor' ? 'Mentee' : 'Mentor'}
+                    </Button>
+
                     <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
                         <Bell className="w-5 h-5" />
                     </Button>
@@ -60,10 +66,14 @@ const TopNavigation = () => {
                     <div className="h-4 w-px bg-border/50 hidden md:block"></div>
 
                     <button className="flex items-center gap-2 pl-2 rounded-full hover:bg-secondary/30 transition-colors p-1 pr-3 border border-transparent hover:border-border/30">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-violet-400 flex items-center justify-center text-primary-foreground text-xs font-bold">
-                            MK
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-violet-400 flex items-center justify-center text-primary-foreground text-xs font-bold uppercase overflow-hidden">
+                            {user?.avatar_url ? (
+                                <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                user?.fullName ? user.fullName.substring(0, 2) : 'MK'
+                            )}
                         </div>
-                        <span className="text-sm font-medium hidden md:block">Maria K.</span>
+                        <span className="text-sm font-medium hidden md:block">{user?.fullName || 'User'}</span>
                     </button>
                 </div>
             </div>

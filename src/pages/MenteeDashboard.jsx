@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
 import {
   Calendar, Folder, CheckSquare, MessageSquare, Flame, ArrowRight,
@@ -80,10 +81,7 @@ const resources = [
   { id: '4', title: 'Scaling Applications', type: 'Video', icon: TrendingUp, progress: 60, color: '#f59e0b' },
 ];
 
-const upcomingSessions = [
-  { mentor: 'Sarah Chen', topic: 'React Optimization', time: 'Tomorrow, 3:00 PM', avatar: 'SC', gradient: 'from-violet-500 to-fuchsia-500' },
-  { mentor: 'Mike Johnson', topic: 'Portfolio Review', time: 'Thu, 11:00 AM', avatar: 'MJ', gradient: 'from-sky-500 to-cyan-400' },
-];
+// Fetched from supabase now
 
 // ─── Heatmap Cell ──────────────────────────────────────────────
 const HeatmapCell = ({ intensity }) => {
@@ -122,6 +120,36 @@ const ProgressTooltip = ({ active, payload, label }) => {
 
 // ─── MAIN COMPONENT ────────────────────────────────────────────
 export default function MenteeDashboard() {
+  const [upcomingSessions, setUpcomingSessions] = useState([]);
+
+  React.useEffect(() => {
+    const fetchSessions = async () => {
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('*')
+        .order('start_time', { ascending: true })
+        .limit(3);
+
+      if (data) {
+        setUpcomingSessions(
+          data.map((ev) => {
+            const startDate = new Date(ev.start_time);
+            return {
+              id: ev.id,
+              mentor: ev.mentor_name || 'Mentor',
+              topic: ev.topic || 'Mentorship Session',
+              time: `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+              avatar: (ev.mentor_name || 'M')[0].toUpperCase(),
+              gradient: 'from-indigo-500 to-violet-500',
+              link: ev.calendar_link,
+            };
+          })
+        );
+      }
+    };
+    fetchSessions();
+  }, []);
+
   const totalHours = weeklyActivity.reduce((s, d) => s + d.hours, 0).toFixed(1);
 
   return (

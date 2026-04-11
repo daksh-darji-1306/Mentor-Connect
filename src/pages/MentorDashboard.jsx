@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, StatCard, ChartSection } from '../components/dashboard/DashboardWidgets';
 import { Users, Clock, Calendar, Star, MessageSquare, ArrowUpRight, CheckCircle2, X } from 'lucide-react';
@@ -21,49 +21,92 @@ const MentorDashboard = () => {
 
     const handleAddSession = async (e) => {
         e.preventDefault();
-        if (!token) return alert('Please connect calendar first');
         setIsSubmitting(true);
         try {
             const startDateTime = new Date(`${sessionDate}T${sessionTime}`);
             const endDateTime = new Date(startDateTime.getTime() + parseInt(sessionDuration) * 60000);
             
-            const event = {
-                summary: `Mentorship Session: ${sessionTopic}`,
-                description: 'Scheduled via Mentor-Connect.',
-                start: {
-                    dateTime: startDateTime.toISOString(),
-                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                },
-                end: {
-                    dateTime: endDateTime.toISOString(),
-                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                },
-            };
-            
-            const newEvent = await addEvent(event);
-            if (newEvent) {
-                // Insert to Supabase Database
-                const { error: dbError } = await supabase.from('sessions').insert({
-                    google_event_id: newEvent.id || 'none',
-                    mentor_id: user?.id || null,
-                    mentor_name: user?.fullName || 'Mentor',
-                    topic: sessionTopic,
-                    start_time: startDateTime.toISOString(),
-                    duration_minutes: parseInt(sessionDuration),
-                    calendar_link: newEvent.htmlLink || ''
-                });
+            let googleEventId = 'none';
+            let calendarLink = '';
 
-                if (dbError) {
-                    console.error("Supabase insert error:", dbError);
+            if (token) {
+                const event = {
+                    summary: `Mentorship Session: ${sessionTopic}`,
+                    description: 'Scheduled via Mentor-Connect.',
+                    start: {
+                        dateTime: startDateTime.toISOString(),
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    },
+                    end: {
+                        dateTime: endDateTime.toISOString(),
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    },
+                    conferenceData: {
+                        createRequest: {
+                            requestId: `mentor-connect-${Date.now()}`,
+                            conferenceSolutionKey: { type: 'hangoutsMeet' }
+                        }
+                    }
+                };
+                
+                const newEvent = await addEvent(event);
+                if (newEvent) {
+                    googleEventId = newEvent.id || 'none';
+                    calendarLink = newEvent.hangoutLink || newEvent.htmlLink || '';
+                } else {
+                    alert('Failed to add session to Google Calendar. Adding to Database only.');
                 }
-
+            }
+            // If user is a demo user or missing, skip actual Supabase DB insert to avoid UUID/RLS crashes
+            if (!user?.id || user.id.startsWith('demo-')) {
+                alert(token && googleEventId !== 'none' 
+                    ? 'Session added to Google Calendar! (Database Insert Simulated for Demo)' 
+                    : 'Session added! (Database Insert Simulated for Demo)');
+                
                 setShowAddModal(false);
                 setSessionTopic('');
                 setSessionDate('');
                 setSessionTime('');
-                alert('Session added to Google Calendar & Database!');
+                setIsSubmitting(false);
+                
+                // Optimistically update UI
+                setUpcomingSessions(prev => [...prev, {
+                     id: Date.now(),
+                     mentee: 'Open Slot',
+                     time: `${startDateTime.toLocaleDateString()} ${startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+                     topic: sessionTopic
+                }]);
+                return;
+            }
+            
+            // Insert to Supabase Database
+            const { error: dbError } = await supabase.from('sessions').insert({
+                google_event_id: googleEventId,
+                mentor_id: user.id,
+                mentor_name: user.fullName || 'Mentor',
+                topic: sessionTopic,
+                start_time: startDateTime.toISOString(),
+                duration_minutes: parseInt(sessionDuration),
+                calendar_link: calendarLink
+            });
+
+            if (dbError) {
+                console.error("Supabase insert error:", dbError);
+                // Give explicit fallback messages if DB wiped or token stale
+                if (dbError.code === '23503') { 
+                    alert('Error: Your user profile is missing from the database. Please sign out and sign up again.');
+                } else if (dbError.code === '42501') {
+                    alert('Permission Denied: Database wiped or stale token. Try signing out and back in.');
+                } else {
+                    alert(`Database Error: ${dbError.message}`);
+                }
             } else {
-                alert('Failed to add session to Google Calendar.');
+                setShowAddModal(false);
+                setSessionTopic('');
+                setSessionDate('');
+                setSessionTime('');
+
+                alert(token && googleEventId !== 'none' ? 'Session added to Google Calendar & Database!' : 'Session added to Database!');
             }
         } catch(error) {
             alert('Error adding session');
@@ -79,10 +122,34 @@ const MentorDashboard = () => {
         { title: "Avg. Rating", value: "4.9", icon: Star, trend: 0 },
     ];
 
-    const upcomingSessions = [
-        { mentee: "Alex Johnson", time: "Today, 3:00 PM", topic: "React Pattern Review" },
-        { mentee: "Sam Smith", time: "Tomorrow, 11:00 AM", topic: "Career Guidance" },
-    ];
+    const [upcomingSessions, setUpcomingSessions] = useState([]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+        const fetchSessions = async () => {
+            const { data, error } = await supabase
+                .from('sessions')
+                .select('*')
+                .eq('mentor_id', user.id)
+                .order('start_time', { ascending: true })
+                .limit(4);
+
+            if (data) {
+                setUpcomingSessions(
+                    data.map((ev) => {
+                        const startDate = new Date(ev.start_time);
+                        return {
+                            id: ev.id,
+                            mentee: 'Open Slot', // It's a newly created session slot!
+                            time: `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+                            topic: ev.topic || 'Mentorship Session'
+                        };
+                    })
+                );
+            }
+        };
+        fetchSessions();
+    }, [user?.id, showAddModal]); // Refetch when a new session is added (modal closes)
 
     const requests = [
         { name: "Jordan Lee", role: "Junior Dev", message: "Looking for guidance in System Design..." },
@@ -120,17 +187,15 @@ const MentorDashboard = () => {
                                 <Calendar className="w-4 h-4 text-primary" /> Upcoming Sessions
                             </h3>
                             <div className="flex gap-2">
+                                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowAddModal(true)}>
+                                    Add Session
+                                </Button>
                                 {token ? (
-                                    <>
-                                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowAddModal(true)}>
-                                            Add Session
-                                        </Button>
-                                        <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-destructive" onClick={() => logout()}>
-                                            Disconnect
-                                        </Button>
-                                    </>
+                                    <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-destructive" onClick={() => logout()}>
+                                        Disconnect
+                                    </Button>
                                 ) : (
-                                    <Button size="sm" className="h-8 text-xs" onClick={() => login()}>
+                                    <Button size="sm" variant="secondary" className="h-8 text-xs outline outline-1 outline-primary/50" onClick={() => login()}>
                                         Connect Google Calendar
                                     </Button>
                                 )}
@@ -261,7 +326,7 @@ const MentorDashboard = () => {
                             </div>
                             <div className="pt-2">
                                 <Button type="submit" disabled={isSubmitting} className="w-full">
-                                    {isSubmitting ? 'Adding...' : 'Add to Calendar'}
+                                    {isSubmitting ? 'Adding...' : (token ? 'Add to Calendar & Database' : 'Add Session')}
                                 </Button>
                             </div>
                         </form>

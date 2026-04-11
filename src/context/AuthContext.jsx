@@ -155,6 +155,23 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('demo_user', JSON.stringify(demoUser));
     };
 
+    const toggleRole = async () => {
+        if (!user) return;
+        const newRole = user.role === 'mentor' ? 'mentee' : 'mentor';
+        
+        // Update local state
+        const updatedUser = { ...user, role: newRole };
+        setUser(updatedUser);
+
+        // If it's a demo user, persist to local storage
+        if (user.id?.startsWith('demo-')) {
+            localStorage.setItem('demo_user', JSON.stringify(updatedUser));
+        } else {
+            // Update supabase profiles table so the change persists on reload
+            await supabase.from('profiles').update({ role: newRole }).eq('id', user.id);
+        }
+    };
+
     const value = {
         user,
         loading,
@@ -163,6 +180,7 @@ export const AuthProvider = ({ children }) => {
         loginWithGoogle,
         loginWithLinkedIn,
         demoLogin,
+        toggleRole,
         logout
     };
 

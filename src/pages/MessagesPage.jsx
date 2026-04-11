@@ -7,45 +7,39 @@ import { supabase } from '../lib/supabase';
 
 const MessagesPage = () => {
     const { user } = useAuth();
-    const [selectedChat, setSelectedChat] = useState("dummy-1");
+    const [selectedChat, setSelectedChat] = useState(null);
+    const [chats, setChats] = useState([]);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
 
-    const chats = [
-        {
-            id: "dummy-1",
-            name: "Dr. Maria Khan",
-            role: "Mentor",
-            lastMessage: "That sounds like a great plan. Let's review it...",
-            time: "10:30 AM",
-            unread: 2,
-            avatar: "M",
-            color: "bg-blue-500",
-            online: true
-        },
-        {
-            id: "dummy-2",
-            name: "Sarah Connor",
-            role: "Mentor",
-            lastMessage: "Can you send me the updated resume?",
-            time: "Yesterday",
-            unread: 0,
-            avatar: "S",
-            color: "bg-purple-500",
-            online: false
-        },
-        {
-            id: "dummy-3",
-            name: "David Chen",
-            role: "Mentor",
-            lastMessage: "Thanks for the session!",
-            time: "Oct 20",
-            unread: 0,
-            avatar: "D",
-            color: "bg-green-500",
-            online: false
-        }
-    ];
+    useEffect(() => {
+        if (!user) return;
+        // Fetch real available users to chat with
+        const fetchProfiles = async () => {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .neq('id', user.id);
+            if (data) {
+                const formattedChats = data.map(p => ({
+                    id: p.id,
+                    name: p.full_name || p.email.split('@')[0],
+                    role: p.role,
+                    lastMessage: 'Tap to view conversation',
+                    time: '',
+                    unread: 0,
+                    avatar: (p.full_name || p.email || 'A')[0].toUpperCase(),
+                    color: p.role === 'mentor' ? 'bg-blue-500' : 'bg-green-500',
+                    online: true 
+                }));
+                setChats(formattedChats);
+                if (formattedChats.length > 0) {
+                    setSelectedChat(formattedChats[0].id);
+                }
+            }
+        };
+        fetchProfiles();
+    }, [user]);
 
     const currentChat = chats.find(c => c.id === selectedChat);
 
@@ -156,25 +150,31 @@ const MessagesPage = () => {
             {/* Chat Window */}
             <Card className="hidden md:flex flex-1 flex-col p-0 overflow-hidden h-full">
                 {/* Chat Header */}
-                <div className="p-4 border-b border-border/50 flex justify-between items-center bg-secondary/5">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full ${currentChat.color} flex items-center justify-center text-white font-bold`}>
-                            {currentChat.avatar}
+                {currentChat ? (
+                    <div className="p-4 border-b border-border/50 flex justify-between items-center bg-secondary/5">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full ${currentChat.color} flex items-center justify-center text-white font-bold`}>
+                                {currentChat.avatar}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-foreground">{currentChat.name}</h3>
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    {currentChat.online ? <span className="w-2 h-2 bg-green-500 rounded-full" /> : null}
+                                    {currentChat.online ? 'Online' : 'Offline'}
+                                </span>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="font-bold text-foreground">{currentChat.name}</h3>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                {currentChat.online ? <span className="w-2 h-2 bg-green-500 rounded-full" /> : null}
-                                {currentChat.online ? 'Online' : 'Offline'}
-                            </span>
+                        <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon"><Phone className="w-5 h-5 text-muted-foreground" /></Button>
+                            <Button variant="ghost" size="icon"><Video className="w-5 h-5 text-muted-foreground" /></Button>
+                            <Button variant="ghost" size="icon"><MoreVertical className="w-5 h-5 text-muted-foreground" /></Button>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon"><Phone className="w-5 h-5 text-muted-foreground" /></Button>
-                        <Button variant="ghost" size="icon"><Video className="w-5 h-5 text-muted-foreground" /></Button>
-                        <Button variant="ghost" size="icon"><MoreVertical className="w-5 h-5 text-muted-foreground" /></Button>
+                ) : (
+                    <div className="p-4 border-b border-border/50 flex justify-between items-center bg-secondary/5">
+                        <h3 className="font-bold text-foreground">Select a chat</h3>
                     </div>
-                </div>
+                )}
 
                 {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-background/50">
@@ -191,7 +191,7 @@ const MessagesPage = () => {
                         const isOutgoing = msg.sender_id === user?.id;
                         return (
                             <div key={msg.id} className={`flex ${isOutgoing ? 'flex-col items-end gap-1 max-w-[80%] ml-auto' : 'gap-4 max-w-[80%]'}`}>
-                                {!isOutgoing && (
+                                {!isOutgoing && currentChat && (
                                     <div className={`w-8 h-8 rounded-full ${currentChat.color} flex items-center justify-center text-white text-xs font-bold mt-1 shrink-0`}>
                                         {currentChat.avatar}
                                     </div>
