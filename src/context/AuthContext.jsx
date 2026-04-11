@@ -102,6 +102,11 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
+        if (user && user.id && user.id.startsWith('demo-')) {
+            setUser(null);
+            localStorage.removeItem('demo_user');
+            return;
+        }
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
         setUser(null);
@@ -109,6 +114,13 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         // Initial Session Check
+        const storedDemoUser = localStorage.getItem('demo_user');
+        if (storedDemoUser) {
+            setUser(JSON.parse(storedDemoUser));
+            setLoading(false);
+            return;
+        }
+
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
                 fetchProfile(session.user);
@@ -131,6 +143,18 @@ export const AuthProvider = ({ children }) => {
         return () => subscription.unsubscribe();
     }, []);
 
+    const demoLogin = (role) => {
+        const demoUser = {
+            id: `demo-${role}-123`,
+            email: `demo-${role}@example.com`,
+            role: role,
+            fullName: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            displayName: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`
+        };
+        setUser(demoUser);
+        localStorage.setItem('demo_user', JSON.stringify(demoUser));
+    };
+
     const value = {
         user,
         loading,
@@ -138,6 +162,7 @@ export const AuthProvider = ({ children }) => {
         loginWithEmail,
         loginWithGoogle,
         loginWithLinkedIn,
+        demoLogin,
         logout
     };
 

@@ -1,10 +1,77 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, StatCard, ChartSection } from '../components/dashboard/DashboardWidgets';
-import { Users, Clock, Calendar, Star, MessageSquare, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { Users, Clock, Calendar, Star, MessageSquare, ArrowUpRight, CheckCircle2, X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useCalendar } from '../context/CalendarContext';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const MentorDashboard = () => {
+    // Calendar Context & State
+    const { token, login, logout, addEvent } = useCalendar();
+    const { user } = useAuth();
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [sessionTopic, setSessionTopic] = useState('');
+    const [sessionDate, setSessionDate] = useState('');
+    const [sessionTime, setSessionTime] = useState('');
+    const [sessionDuration, setSessionDuration] = useState('60');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleAddSession = async (e) => {
+        e.preventDefault();
+        if (!token) return alert('Please connect calendar first');
+        setIsSubmitting(true);
+        try {
+            const startDateTime = new Date(`${sessionDate}T${sessionTime}`);
+            const endDateTime = new Date(startDateTime.getTime() + parseInt(sessionDuration) * 60000);
+            
+            const event = {
+                summary: `Mentorship Session: ${sessionTopic}`,
+                description: 'Scheduled via Mentor-Connect.',
+                start: {
+                    dateTime: startDateTime.toISOString(),
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                },
+                end: {
+                    dateTime: endDateTime.toISOString(),
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                },
+            };
+            
+            const newEvent = await addEvent(event);
+            if (newEvent) {
+                // Insert to Supabase Database
+                const { error: dbError } = await supabase.from('sessions').insert({
+                    google_event_id: newEvent.id || 'none',
+                    mentor_id: user?.id || null,
+                    mentor_name: user?.fullName || 'Mentor',
+                    topic: sessionTopic,
+                    start_time: startDateTime.toISOString(),
+                    duration_minutes: parseInt(sessionDuration),
+                    calendar_link: newEvent.htmlLink || ''
+                });
+
+                if (dbError) {
+                    console.error("Supabase insert error:", dbError);
+                }
+
+                setShowAddModal(false);
+                setSessionTopic('');
+                setSessionDate('');
+                setSessionTime('');
+                alert('Session added to Google Calendar & Database!');
+            } else {
+                alert('Failed to add session to Google Calendar.');
+            }
+        } catch(error) {
+            alert('Error adding session');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     // Mock Data
     const stats = [
         { title: "Total Mentees", value: "12", icon: Users, trend: 15 },
@@ -52,7 +119,22 @@ const MentorDashboard = () => {
                             <h3 className="font-bold text-foreground flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-primary" /> Upcoming Sessions
                             </h3>
-                            <Button variant="outline" size="sm" className="h-8 text-xs">Sync Calendar</Button>
+                            <div className="flex gap-2">
+                                {token ? (
+                                    <>
+                                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowAddModal(true)}>
+                                            Add Session
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-destructive" onClick={() => logout()}>
+                                            Disconnect
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <Button size="sm" className="h-8 text-xs" onClick={() => login()}>
+                                        Connect Google Calendar
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                         <div className="space-y-3">
                             {upcomingSessions.map((session, i) => (
@@ -128,6 +210,66 @@ const MentorDashboard = () => {
                     </Card>
                 </section>
             </div>
+        {/* Add Session Modal */}
+        <AnimatePresence>
+            {showAddModal && (
+                <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+                >
+                    <motion.div 
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.95, opacity: 0 }}
+                        className="bg-card w-full max-w-md border border-border/50 rounded-xl shadow-2xl overflow-hidden"
+                    >
+                        <div className="flex items-center justify-between p-4 border-b border-border/50">
+                            <h3 className="font-bold text-lg text-foreground">Add New Session</h3>
+                            <Button variant="ghost" size="icon" onClick={() => setShowAddModal(false)} className="h-8 w-8 rounded-full">
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                        <form onSubmit={handleAddSession} className="p-4 space-y-4">
+                            <div>
+                                <label className="text-sm font-medium text-foreground mb-1 block">Session Topic</label>
+                                <Input required value={sessionTopic} onChange={e => setSessionTopic(e.target.value)} placeholder="e.g. React Pattern Review" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-sm font-medium text-foreground mb-1 block">Date</label>
+                                    <Input required type="date" value={sessionDate} onChange={e => setSessionDate(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium text-foreground mb-1 block">Time</label>
+                                    <Input required type="time" value={sessionTime} onChange={e => setSessionTime(e.target.value)} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-foreground mb-1 block">Duration</label>
+                                <select 
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={sessionDuration} 
+                                    onChange={e => setSessionDuration(e.target.value)}
+                                >
+                                    <option value="30">30 minutes</option>
+                                    <option value="60">1 Hour</option>
+                                    <option value="90">1.5 Hours</option>
+                                    <option value="120">2 Hours</option>
+                                </select>
+                            </div>
+                            <div className="pt-2">
+                                <Button type="submit" disabled={isSubmitting} className="w-full">
+                                    {isSubmitting ? 'Adding...' : 'Add to Calendar'}
+                                </Button>
+                            </div>
+                        </form>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+
         </motion.div>
     );
 };

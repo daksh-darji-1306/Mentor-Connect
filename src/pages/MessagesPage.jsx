@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, MoreVertical, Phone, Video, Image, Paperclip, Send } from 'lucide-react';
 import { Card } from '../components/dashboard/DashboardWidgets';
 import { Button } from "@/components/ui/button";
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const MessagesPage = () => {
-    const [selectedChat, setSelectedChat] = useState(1);
+    const { user } = useAuth();
+    const [selectedChat, setSelectedChat] = useState("dummy-1");
+    const [messages, setMessages] = useState([]);
+    const [newMessage, setNewMessage] = useState('');
 
     const chats = [
         {
-            id: 1,
+            id: "dummy-1",
             name: "Dr. Maria Khan",
             role: "Mentor",
             lastMessage: "That sounds like a great plan. Let's review it...",
@@ -19,7 +24,7 @@ const MessagesPage = () => {
             online: true
         },
         {
-            id: 2,
+            id: "dummy-2",
             name: "Sarah Connor",
             role: "Mentor",
             lastMessage: "Can you send me the updated resume?",
@@ -30,7 +35,7 @@ const MessagesPage = () => {
             online: false
         },
         {
-            id: 3,
+            id: "dummy-3",
             name: "David Chen",
             role: "Mentor",
             lastMessage: "Thanks for the session!",
@@ -43,6 +48,61 @@ const MessagesPage = () => {
     ];
 
     const currentChat = chats.find(c => c.id === selectedChat);
+
+    useEffect(() => {
+        if (!user || !selectedChat) return;
+
+        // Fetch historical messages
+        const fetchMessages = async () => {
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedChat}),and(sender_id.eq.${selectedChat},receiver_id.eq.${user.id})`)
+                .order('created_at', { ascending: true });
+                
+            if (data) setMessages(data);
+            if (error) console.error("Error fetching messages:", error);
+        };
+        fetchMessages();
+
+        // Subscribe to real-time incoming messages
+        const channel = supabase.channel('public:messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+                const newMsg = payload.new;
+                if ((newMsg.sender_id === user.id && newMsg.receiver_id === selectedChat) || 
+                    (newMsg.sender_id === selectedChat && newMsg.receiver_id === user.id)) {
+                    setMessages(prev => [...prev, newMsg]);
+                }
+            })
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
+    }, [user, selectedChat]);
+
+    const handleSendMessage = async (e) => {
+        if (e) e.preventDefault();
+        if (!newMessage.trim() || !user) return;
+        
+        const tempMsg = {
+            id: Date.now().toString(),
+            sender_id: user.id,
+            receiver_id: selectedChat,
+            content: newMessage,
+            created_at: new Date().toISOString()
+        };
+        
+        // Optimistic UI update
+        setMessages(prev => [...prev, tempMsg]);
+        setNewMessage('');
+        
+        const { error } = await supabase.from('messages').insert([{
+            sender_id: tempMsg.sender_id,
+            receiver_id: tempMsg.receiver_id,
+            content: tempMsg.content
+        }]);
+        
+        if (error) console.error("Error sending message:", error);
+    };
 
     return (
         <div className="h-[calc(100vh-8rem)] min-h-[600px] flex gap-6">
@@ -123,47 +183,53 @@ const MessagesPage = () => {
                         <span className="text-xs font-medium text-muted-foreground bg-secondary/50 px-3 py-1 rounded-full">Today</span>
                     </div>
 
-                    {/* Message Incoming */}
-                    <div className="flex gap-4 max-w-[80%]">
-                        <div className={`w-8 h-8 rounded-full ${currentChat.color} flex items-center justify-center text-white text-xs font-bold mt-1`}>
-                            {currentChat.avatar}
-                        </div>
-                        <div className="space-y-1">
-                            <div className="bg-secondary rounded-2xl rounded-tl-none px-4 py-3 text-sm text-foreground">
-                                Hi! I reviewed your project code. It looks solid, but there are a few optimization opportunities in the `useEffect` hooks.
+                    {/* Dynamic Messages Map */}
+                    {messages.length === 0 && (
+                        <div className="text-center text-sm text-muted-foreground pt-10">Send a message to start the conversation!</div>
+                    )}
+                    {messages.map(msg => {
+                        const isOutgoing = msg.sender_id === user?.id;
+                        return (
+                            <div key={msg.id} className={`flex ${isOutgoing ? 'flex-col items-end gap-1 max-w-[80%] ml-auto' : 'gap-4 max-w-[80%]'}`}>
+                                {!isOutgoing && (
+                                    <div className={`w-8 h-8 rounded-full ${currentChat.color} flex items-center justify-center text-white text-xs font-bold mt-1 shrink-0`}>
+                                        {currentChat.avatar}
+                                    </div>
+                                )}
+                                <div className="space-y-1">
+                                    <div className={`rounded-2xl px-4 py-3 text-sm ${isOutgoing ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-secondary text-foreground rounded-tl-none'}`}>
+                                        {msg.content}
+                                    </div>
+                                    <div className={`text-xs text-muted-foreground ${isOutgoing ? 'text-right mr-1' : 'ml-1'}`}>
+                                        {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                                    </div>
+                                </div>
                             </div>
-                            <span className="text-xs text-muted-foreground ml-1">10:30 AM</span>
-                        </div>
-                    </div>
-
-                    {/* Message Outgoing */}
-                    <div className="flex flex-col items-end gap-1 max-w-[80%] ml-auto">
-                        <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none px-4 py-3 text-sm">
-                            Thanks, Maria! I was actually struggling with the dependency array there. Could we go over that today?
-                        </div>
-                        <span className="text-xs text-muted-foreground mr-1">10:32 AM</span>
-                    </div>
+                        );
+                    })}
                 </div>
 
                 {/* Input Area */}
-                <div className="p-4 border-t border-border/50 bg-background">
+                <form onSubmit={handleSendMessage} className="p-4 border-t border-border/50 bg-background">
                     <div className="flex items-center gap-2 bg-secondary/30 rounded-xl p-2">
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                        <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
                             <Paperclip className="w-5 h-5" />
                         </Button>
                         <input
                             type="text"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
                             placeholder="Type a message..."
                             className="flex-1 bg-transparent border-none focus:ring-0 text-sm px-2 outline-none h-10"
                         />
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                        <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
                             <Image className="w-5 h-5" />
                         </Button>
-                        <Button size="icon" className="rounded-lg">
+                        <Button type="submit" size="icon" className="rounded-lg" disabled={!newMessage.trim()}>
                             <Send className="w-4 h-4 ml-0.5" />
                         </Button>
                     </div>
-                </div>
+                </form>
             </Card>
         </div>
     );

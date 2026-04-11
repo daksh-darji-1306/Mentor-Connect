@@ -10,6 +10,8 @@ import Testimonials from './components/Testimonials';
 import Footer from './components/Footer';
 import Pricing from './components/Pricing';
 import { AuthProvider } from './context/AuthContext';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { CalendarProvider } from './context/CalendarContext';
 import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -76,13 +78,17 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <AuthProvider>
-        <div className="App">
-          <AnimatedRoutes />
-        </div>
-      </AuthProvider>
-    </Router>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'placeholder'}>
+      <CalendarProvider>
+        <Router>
+          <AuthProvider>
+            <div className="App">
+              <AnimatedRoutes />
+            </div>
+          </AuthProvider>
+        </Router>
+      </CalendarProvider>
+    </GoogleOAuthProvider>
   );
 }
 

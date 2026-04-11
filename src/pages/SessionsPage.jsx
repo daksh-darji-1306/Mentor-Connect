@@ -1,65 +1,46 @@
 import React, { useState } from 'react';
-import { Calendar as CalendarIcon, Clock, Video, ChevronLeft, ChevronRight, MoreHorizontal, Bell } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Video, ChevronLeft, ChevronRight, MoreHorizontal, Bell, Link2 } from 'lucide-react';
 import { Card } from '../components/dashboard/DashboardWidgets';
 import { Button } from "@/components/ui/button";
 import { motion } from 'framer-motion';
+import { supabase } from '../lib/supabase';
 
 const SessionsPage = () => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [sessions, setSessions] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Mock Data
-    const sessions = [
-        {
-            id: 1,
-            mentor: "Dr. Maria Khan",
-            role: "Senior Data Scientist",
-            time: "8:00 PM",
-            day: 4,
-            topic: "Booked: Mentorship with Dr. Khan",
-            status: "confirmed",
-            color: "bg-amber-400"
-        },
-        {
-            id: 2,
-            mentor: "James Smith",
-            role: "Backend Lead",
-            time: "3:00 PM",
-            day: 10,
-            topic: "Booked: System Design",
-            status: "confirmed",
-            color: "bg-amber-400"
-        },
-        {
-            id: 3,
-            mentor: "James Smith",
-            role: "Backend Lead",
-            time: "5:00 PM",
-            day: 17,
-            topic: "Booked: Code Review",
-            status: "confirmed",
-            color: "bg-amber-400"
-        },
-        {
-            id: 4,
-            mentor: "Sarah Connor",
-            role: "Product Manager",
-            time: "3:00 PM",
-            day: 22,
-            topic: "Booked: Roadmap Planning",
-            status: "confirmed",
-            color: "bg-amber-400"
-        },
-        {
-            id: 5,
-            mentor: "David Chen",
-            role: "Staff Engineer",
-            time: "3:00 PM",
-            day: 29,
-            topic: "Booked: Go Lang Deep Dive",
-            status: "confirmed",
-            color: "bg-amber-400"
-        }
-    ];
+    React.useEffect(() => {
+        const fetchSessions = async () => {
+            setIsLoading(true);
+            const { data, error } = await supabase.from('sessions').select('*');
+            if (error) {
+                console.error("Error fetching sessions:", error);
+            } else if (data) {
+                // Map DB sessions to UI format
+                const formatted = data.map(ev => {
+                    const startDate = new Date(ev.start_time);
+                    return {
+                        id: ev.id,
+                        mentor: ev.mentor_name || "Mentor",
+                        role: "Mentor",
+                        time: startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        day: startDate.getDate(),
+                        month: startDate.getMonth(),
+                        year: startDate.getFullYear(),
+                        topic: ev.topic || "Mentorship Session",
+                        link: ev.calendar_link,
+                        status: "confirmed",
+                        color: "bg-primary"
+                    };
+                }).filter(s => s.month === currentMonth.getMonth() && s.year === currentMonth.getFullYear());
+                setSessions(formatted);
+            }
+            setIsLoading(false);
+        };
+
+        fetchSessions();
+    }, [currentMonth]);
 
     // Calendar Header
     const monthName = currentMonth.toLocaleString('default', { month: 'long' });
@@ -85,10 +66,7 @@ const SessionsPage = () => {
         <div className="h-[calc(100vh-6rem)] flex flex-col space-y-4">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div>
-                    {/* Breadcrumb-ish title if needed, otherwise simplified */}
-                </div>
-                {/* Search/User area could go here if global nav didn't handle it */}
+                <div></div>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-6 h-full min-h-0">
@@ -140,8 +118,8 @@ const SessionsPage = () => {
                                     <div className="flex flex-col gap-1 mt-1 overflow-y-auto custom-scrollbar">
                                         {events.map(event => (
                                             <div key={event.id} className="bg-primary/90 text-primary-foreground p-1.5 rounded text-[10px] items-start leading-tight shadow-sm cursor-pointer hover:bg-primary transition-colors">
-                                                <div className="font-bold mb-0.5">Booked</div>
-                                                <div className="opacity-90 truncate">Mentorship with {event.mentor.split(' ')[0]}</div>
+                                                <div className="font-bold mb-0.5" title={event.topic}>{event.topic}</div>
+                                                <div className="opacity-90 truncate">{event.time}</div>
                                                 <div className="mt-0.5 opacity-75">{event.time}</div>
                                             </div>
                                         ))}
@@ -160,19 +138,29 @@ const SessionsPage = () => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                        {isLoading && (
+                            <div className="text-center text-sm text-muted-foreground p-4">Loading available sessions...</div>
+                        )}
+                        {sessions.length === 0 && !isLoading && (
+                            <div className="text-center text-sm text-muted-foreground p-4">No sessions scheduled for this month.</div>
+                        )}
                         {sessions.map(session => (
                             <div key={session.id} className="bg-card border border-border/50 rounded-xl p-4 flex flex-col gap-3 hover:border-primary/50 transition-colors shadow-sm">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground font-bold text-sm">
-                                        {session.mentor.charAt(0)}
+                                        🗓️
                                     </div>
-                                    <div>
-                                        <h4 className="font-bold text-sm text-foreground">{session.mentor}</h4>
-                                        <p className="text-xs text-muted-foreground">Dec 12, 2023 | {session.time}</p>
+                                    <div className="overflow-hidden">
+                                        <h4 className="font-bold text-sm text-foreground truncate">{session.topic}</h4>
+                                        <p className="text-xs text-muted-foreground">Day {session.day} | {session.time}</p>
                                     </div>
                                 </div>
-                                <Button className="w-full font-bold shadow-md hover:shadow-lg transition-all" size="sm">
-                                    Join Now
+                                <Button 
+                                    className="w-full font-bold shadow-md hover:shadow-lg transition-all" 
+                                    size="sm"
+                                    onClick={() => window.open(session.link, '_blank')}
+                                >
+                                    View in Calendar
                                 </Button>
                             </div>
                         ))}
