@@ -476,9 +476,17 @@ export default function MenteeDashboard() {
                       <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">{s.topic}</p>
                       <p className="text-xs text-muted-foreground">{s.mentor} · {s.time}</p>
                     </div>
-                    <Button size="sm" variant="ghost" className="h-8 w-fit text-xs text-primary hover:bg-primary/10 px-4 rounded-full font-semibold">
-                      <Video className="w-3.5 h-3.5 mr-1" /> Join
-                    </Button>
+                    {s.link ? (
+                      <a href={s.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                        <Button size="sm" variant="ghost" className="h-8 w-fit text-xs text-primary hover:bg-primary/10 px-4 rounded-full font-semibold">
+                          <Video className="w-3.5 h-3.5 mr-1" /> Join
+                        </Button>
+                      </a>
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); alert('No meeting link is attached to this session yet.'); }} className="h-8 w-fit text-xs text-muted-foreground hover:bg-primary/10 px-4 rounded-full font-semibold">
+                        <Video className="w-3.5 h-3.5 mr-1" /> Join
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>

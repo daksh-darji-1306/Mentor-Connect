@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, StatCard, ChartSection } from '../components/dashboard/DashboardWidgets';
-import { Users, Clock, Calendar, Star, MessageSquare, ArrowUpRight, CheckCircle2, X } from 'lucide-react';
+import { Users, Clock, Calendar, Star, MessageSquare, ArrowUpRight, CheckCircle2, X, BarChart3 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { useCalendar } from '../context/CalendarContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -12,6 +13,7 @@ const MentorDashboard = () => {
     // Calendar Context & State
     const { token, login, logout, addEvent } = useCalendar();
     const { user } = useAuth();
+    {/* 1. Header */ }
     const [showAddModal, setShowAddModal] = useState(false);
     const [sessionTopic, setSessionTopic] = useState('');
     const [sessionDate, setSessionDate] = useState('');
@@ -25,7 +27,7 @@ const MentorDashboard = () => {
         try {
             const startDateTime = new Date(`${sessionDate}T${sessionTime}`);
             const endDateTime = new Date(startDateTime.getTime() + parseInt(sessionDuration) * 60000);
-            
+
             let googleEventId = 'none';
             let calendarLink = '';
 
@@ -48,7 +50,7 @@ const MentorDashboard = () => {
                         }
                     }
                 };
-                
+
                 const newEvent = await addEvent(event);
                 if (newEvent) {
                     googleEventId = newEvent.id || 'none';
@@ -57,28 +59,7 @@ const MentorDashboard = () => {
                     alert('Failed to add session to Google Calendar. Adding to Database only.');
                 }
             }
-            // If user is a demo user or missing, skip actual Supabase DB insert to avoid UUID/RLS crashes
-            if (!user?.id || user.id.startsWith('demo-')) {
-                alert(token && googleEventId !== 'none' 
-                    ? 'Session added to Google Calendar! (Database Insert Simulated for Demo)' 
-                    : 'Session added! (Database Insert Simulated for Demo)');
-                
-                setShowAddModal(false);
-                setSessionTopic('');
-                setSessionDate('');
-                setSessionTime('');
-                setIsSubmitting(false);
-                
-                // Optimistically update UI
-                setUpcomingSessions(prev => [...prev, {
-                     id: Date.now(),
-                     mentee: 'Open Slot',
-                     time: `${startDateTime.toLocaleDateString()} ${startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-                     topic: sessionTopic
-                }]);
-                return;
-            }
-            
+
             // Insert to Supabase Database
             const { error: dbError } = await supabase.from('sessions').insert({
                 google_event_id: googleEventId,
@@ -93,7 +74,7 @@ const MentorDashboard = () => {
             if (dbError) {
                 console.error("Supabase insert error:", dbError);
                 // Give explicit fallback messages if DB wiped or token stale
-                if (dbError.code === '23503') { 
+                if (dbError.code === '23503') {
                     alert('Error: Your user profile is missing from the database. Please sign out and sign up again.');
                 } else if (dbError.code === '42501') {
                     alert('Permission Denied: Database wiped or stale token. Try signing out and back in.');
@@ -108,7 +89,7 @@ const MentorDashboard = () => {
 
                 alert(token && googleEventId !== 'none' ? 'Session added to Google Calendar & Database!' : 'Session added to Database!');
             }
-        } catch(error) {
+        } catch (error) {
             alert('Error adding session');
         } finally {
             setIsSubmitting(false);
@@ -142,7 +123,8 @@ const MentorDashboard = () => {
                             id: ev.id,
                             mentee: 'Open Slot', // It's a newly created session slot!
                             time: `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-                            topic: ev.topic || 'Mentorship Session'
+                            topic: ev.topic || 'Mentorship Session',
+                            link: ev.calendar_link || null,
                         };
                     })
                 );
@@ -156,6 +138,123 @@ const MentorDashboard = () => {
         { name: "Casey West", role: "Student", message: "Help pivoting from Marketing to UX..." },
     ];
 
+    const MenteesTab = () => {
+        const [mentees, setMentees] = useState([]);
+        const [loading, setLoading] = useState(true);
+
+        useEffect(() => {
+            const fetchMentees = async () => {
+                if (!user?.id) return;
+                try {
+                    // 1. Fetch sessions this mentor has where someone has booked
+                    const { data: sessionData } = await supabase
+                        .from('sessions')
+                        .select('booked_by, profiles!booked_by(*)')
+                        .eq('mentor_id', user.id)
+                        .not('booked_by', 'is', null);
+
+                    // 2. Fetch accepted requests
+                    const { data: requestData } = await supabase
+                        .from('requests')
+                        .select('mentee_id, profiles!mentee_id(*)')
+                        .eq('mentor_id', user.id)
+                        .eq('status', 'accepted');
+
+                    // Combine and deduplicate
+                    const menteeMap = new Map();
+
+                    sessionData?.forEach(s => {
+                        if (s.profiles) {
+                            menteeMap.set(s.booked_by, {
+                                ...s.profiles,
+                                source: 'session',
+                                total_sessions: (menteeMap.get(s.booked_by)?.total_sessions || 0) + 1
+                            });
+                        }
+                    });
+
+                    requestData?.forEach(r => {
+                        if (r.profiles) {
+                            menteeMap.set(r.mentee_id, {
+                                ...r.profiles,
+                                ...(menteeMap.get(r.mentee_id) || {}),
+                                source: 'request'
+                            });
+                        }
+                    });
+
+                    setMentees(Array.from(menteeMap.values()));
+                } catch (err) {
+                    console.error("Error fetching mentees:", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchMentees();
+        }, []);
+
+        if (loading) return <div className="p-8 text-center text-muted-foreground">Loading mentees...</div>;
+        if (mentees.length === 0) return (
+            <div className="flex flex-col items-center justify-center p-12 text-center bg-secondary/10 rounded-3xl border border-dashed border-border">
+                <Users className="w-12 h-12 text-muted-foreground/30 mb-4" />
+                <h3 className="font-bold text-lg text-foreground">No Mentees Yet</h3>
+                <p className="text-muted-foreground max-w-xs mt-1">Once users book sessions or you accept requests, they will appear here to track their progress.</p>
+            </div>
+        );
+
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {mentees.map((mentee) => {
+                    // Mocked progress for now as per plan
+                    const progress = Math.floor(Math.random() * 60) + 30;
+                    return (
+                        <Card key={mentee.id} className="group hover:border-primary/50 transition-all">
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center text-primary font-bold text-xl ring-1 ring-primary/20">
+                                    {mentee.full_name?.charAt(0) || 'M'}
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-foreground group-hover:text-primary transition-colors">
+                                        {mentee.full_name}
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">{mentee.email}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex items-center justify-between text-xs mb-1.5">
+                                        <span className="text-muted-foreground font-medium">Learning Progress</span>
+                                        <span className="text-primary font-bold">{progress}%</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-secondary/50 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${progress}%` }}
+                                            className="h-full bg-primary rounded-full transition-all"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                                        <span className="text-xs text-foreground font-medium">
+                                            {mentee.total_sessions || 1} Sessions
+                                        </span>
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="h-8 text-xs text-primary hover:bg-primary/5 px-3">
+                                        Message <ArrowUpRight className="w-3 h-3 ml-1" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    );
+                })}
+            </div>
+        );
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -163,17 +262,25 @@ const MentorDashboard = () => {
             className="space-y-8"
         >
             {/* 1. Header & Stats */}
-            <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="md:col-span-1 flex flex-col justify-center">
-                    <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-                    <p className="text-muted-foreground">Overview</p>
+            <section className="space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+                        <p className="text-muted-foreground">Welcome back! Here's your mentorship overview.</p>
+                    </div>
+                    <Button onClick={() => setShowAddModal(true)} variant="outline" size="sm" className="h-9">
+                        <Calendar className="w-4 h-4 mr-2" /> Add Session Slot
+                    </Button>
                 </div>
-                {stats.map((stat, i) => (
-                    <StatCard key={i} {...stat} />
-                ))}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {stats.map((stat, i) => (
+                        <StatCard key={i} {...stat} />
+                    ))}
+                </div>
             </section>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
                 {/* 2. Main Focus: Action Center */}
                 <section className="lg:col-span-2 space-y-6">
                     <div className="flex items-center justify-between">
@@ -187,12 +294,9 @@ const MentorDashboard = () => {
                                 <Calendar className="w-4 h-4 text-primary" /> Upcoming Sessions
                             </h3>
                             <div className="flex gap-2">
-                                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowAddModal(true)}>
-                                    Add Session
-                                </Button>
                                 {token ? (
                                     <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-destructive" onClick={() => logout()}>
-                                        Disconnect
+                                        Disconnect Google Calendar
                                     </Button>
                                 ) : (
                                     <Button size="sm" variant="secondary" className="h-8 text-xs outline outline-1 outline-primary/50" onClick={() => login()}>
@@ -215,10 +319,22 @@ const MentorDashboard = () => {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-sm font-medium text-foreground">{session.time}</div>
-                                        <button className="text-xs text-primary hover:underline">Start Meeting</button>
+                                        {session.link ? (
+                                            <button
+                                                className="text-xs text-primary hover:underline font-semibold"
+                                                onClick={() => window.open(session.link, '_blank', 'noopener,noreferrer')}
+                                            >
+                                                Start Meeting
+                                            </button>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">No Link</span>
+                                        )}
                                     </div>
                                 </div>
                             ))}
+                            {upcomingSessions.length === 0 && (
+                                <p className="text-sm text-muted-foreground py-4 text-center">No upcoming sessions. Add one to get started!</p>
+                            )}
                         </div>
                     </Card>
 
@@ -228,7 +344,7 @@ const MentorDashboard = () => {
                             <h3 className="font-bold text-foreground flex items-center gap-2">
                                 <MessageSquare className="w-4 h-4 text-primary" /> New Requests
                             </h3>
-                            <span className="text-xs text-muted-foreground">2 pending</span>
+                            <span className="text-xs text-muted-foreground">Recent requests</span>
                         </div>
                         <div className="space-y-4">
                             {requests.map((req, i) => (
@@ -275,68 +391,74 @@ const MentorDashboard = () => {
                     </Card>
                 </section>
             </div>
-        {/* Add Session Modal */}
-        <AnimatePresence>
-            {showAddModal && (
-                <motion.div 
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }} 
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-                >
-                    <motion.div 
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.95, opacity: 0 }}
-                        className="bg-card w-full max-w-md border border-border/50 rounded-xl shadow-2xl overflow-hidden"
+
+            {/* Add Session Modal */}
+            <AnimatePresence>
+                {showAddModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
                     >
-                        <div className="flex items-center justify-between p-4 border-b border-border/50">
-                            <h3 className="font-bold text-lg text-foreground">Add New Session</h3>
-                            <Button variant="ghost" size="icon" onClick={() => setShowAddModal(false)} className="h-8 w-8 rounded-full">
-                                <X className="w-4 h-4" />
-                            </Button>
-                        </div>
-                        <form onSubmit={handleAddSession} className="p-4 space-y-4">
-                            <div>
-                                <label className="text-sm font-medium text-foreground mb-1 block">Session Topic</label>
-                                <Input required value={sessionTopic} onChange={e => setSessionTopic(e.target.value)} placeholder="e.g. React Pattern Review" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-sm font-medium text-foreground mb-1 block">Date</label>
-                                    <Input required type="date" value={sessionDate} onChange={e => setSessionDate(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-foreground mb-1 block">Time</label>
-                                    <Input required type="time" value={sessionTime} onChange={e => setSessionTime(e.target.value)} />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-foreground mb-1 block">Duration</label>
-                                <select 
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    value={sessionDuration} 
-                                    onChange={e => setSessionDuration(e.target.value)}
-                                >
-                                    <option value="30">30 minutes</option>
-                                    <option value="60">1 Hour</option>
-                                    <option value="90">1.5 Hours</option>
-                                    <option value="120">2 Hours</option>
-                                </select>
-                            </div>
-                            <div className="pt-2">
-                                <Button type="submit" disabled={isSubmitting} className="w-full">
-                                    {isSubmitting ? 'Adding...' : (token ? 'Add to Calendar & Database' : 'Add Session')}
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-card w-full max-w-md border border-border/50 rounded-xl shadow-2xl overflow-hidden"
+                        >
+                            <div className="flex items-center justify-between p-4 border-b border-border/50">
+                                <h3 className="font-bold text-lg text-foreground">Add New Session</h3>
+                                <Button variant="ghost" size="icon" onClick={() => setShowAddModal(false)} className="h-8 w-8 rounded-full">
+                                    <X className="w-4 h-4" />
                                 </Button>
                             </div>
-                        </form>
+                            <form onSubmit={handleAddSession} className="p-4 space-y-4">
+                                <div>
+                                    <label className="text-sm font-medium text-foreground mb-1 block">Session Topic</label>
+                                    <Input required value={sessionTopic} onChange={e => setSessionTopic(e.target.value)} placeholder="e.g. React Pattern Review" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-sm font-medium text-foreground mb-1 block">Date</label>
+                                        <Input required type="date" value={sessionDate} onChange={e => setSessionDate(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-foreground mb-1 block">Time</label>
+                                        <Input required type="time" value={sessionTime} onChange={e => setSessionTime(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium text-foreground mb-1 block">Duration</label>
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={sessionDuration}
+                                        onChange={e => setSessionDuration(e.target.value)}
+                                    >
+                                        <option value="30">30 minutes</option>
+                                        <option value="60">1 Hour</option>
+                                        <option value="90">1.5 Hours</option>
+                                        <option value="120">2 Hours</option>
+                                    </select>
+                                </div>
+                                <div className="pt-2">
+                                    <Button type="submit" disabled={isSubmitting} className="w-full">
+                                        {isSubmitting ? 'Adding...' : (token ? 'Add to Calendar & Database' : 'Add Session')}
+                                    </Button>
+                                </div>
+                            </form>
+                        </motion.div>
                     </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-
+                )}
+            </AnimatePresence>
         </motion.div>
     );
+};
+
+const MenteesTab = () => {
+    // Moved logic into separate file or component if still needed, 
+    // but the main Mentee list is now in MenteesPage.jsx
+    return null;
 };
 
 export default MentorDashboard;

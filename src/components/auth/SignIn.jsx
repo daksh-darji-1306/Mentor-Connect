@@ -13,7 +13,7 @@ import GridPattern from '../ui/grid-pattern';
 
 
 export default function SignIn() {
-    const { loginWithGoogle, loginWithLinkedIn, loginWithEmail, demoLogin } = useAuth();
+    const { loginWithGoogle, loginWithEmail } = useAuth();
     const [error, setError] = useState('');
     const [cookieConsent, setCookieConsent] = useState(false);
     const navigate = useNavigate();
@@ -29,7 +29,14 @@ export default function SignIn() {
         if (consent === 'true') {
             setCookieConsent(true);
         }
-    }, []);
+
+        // Check for error query param
+        const params = new URLSearchParams(window.location.search);
+        const errorParam = params.get('error');
+        if (errorParam === 'not_registered') {
+            setError('This email ID is not registered');
+        }
+    }, [navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -52,6 +59,7 @@ export default function SignIn() {
     const handleGoogleLogin = async () => {
         try {
             setError('');
+            localStorage.setItem('signup_intent', 'false');
             await loginWithGoogle();
             if (cookieConsent) {
                 setPreference('last_login_method', 'google');
@@ -59,20 +67,6 @@ export default function SignIn() {
             navigate('/dashboard');
         } catch (err) {
             setError('Failed to sign in with Google');
-            console.error(err);
-        }
-    };
-
-    const handleLinkedInLogin = async () => {
-        try {
-            setError('');
-            await loginWithLinkedIn();
-            if (cookieConsent) {
-                setPreference('last_login_method', 'linkedin');
-            }
-            navigate('/dashboard');
-        } catch (err) {
-            setError('Failed to sign in with LinkedIn');
             console.error(err);
         }
     };
@@ -190,30 +184,13 @@ export default function SignIn() {
                         <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or continue with</span></div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <Button variant="outline" onClick={handleGoogleLogin} className="flex items-center gap-2">
+                    <div className="grid grid-cols-1 gap-4">
+                        <Button variant="outline" onClick={handleGoogleLogin} className="flex items-center justify-center gap-2">
                             <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="h-5 w-5" />
                             Google
                         </Button>
-                        <Button variant="outline" onClick={handleLinkedInLogin} className="flex items-center gap-2">
-                            <svg className="h-5 w-5 fill-[#0077b5]" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
-                            LinkedIn
-                        </Button>
                     </div>
 
-                    <div className="relative my-6">
-                        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-muted"></span></div>
-                        <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Demo Accounts</span></div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <Button variant="secondary" onClick={() => { demoLogin('mentee'); navigate('/dashboard'); }} className="flex items-center gap-2 font-semibold">
-                            Demo Mentee
-                        </Button>
-                        <Button variant="secondary" onClick={() => { demoLogin('mentor'); navigate('/dashboard'); }} className="flex items-center gap-2 font-semibold">
-                            Demo Mentor
-                        </Button>
-                    </div>
 
                     <div className="mt-8 text-center text-sm text-muted-foreground">
                         Don't have an account? <Link to="/signup" className="text-primary font-bold hover:underline">Sign Up</Link>

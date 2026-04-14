@@ -20,6 +20,7 @@ import MentorsPage from './pages/MentorsPage';
 import SessionsPage from './pages/SessionsPage';
 import MessagesPage from './pages/MessagesPage';
 import WaitlistModal from './components/WaitlistModal';
+import SettingsPage from './pages/SettingsPage';
 
 // Landing Page Wrapper
 
@@ -44,6 +45,8 @@ import SmoothScroll from './components/SmoothScroll';
 
 import Onboarding from './pages/Onboarding';
 
+import MenteesPage from './pages/MenteesPage';
+
 // Separated for useLocation() access
 const AnimatedRoutes = () => {
   const location = useLocation();
@@ -58,8 +61,11 @@ const AnimatedRoutes = () => {
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardHome />} />
           <Route path="/mentors" element={<MentorsPage />} />
+          <Route path="/mentees" element={<MenteesPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/profile" element={<SettingsPage />} />
         </Route>
       </Routes>
     </AnimatePresence>

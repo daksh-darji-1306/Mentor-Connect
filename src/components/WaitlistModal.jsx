@@ -98,7 +98,7 @@ const WaitlistModal = ({ isOpen, onClose }) => {
       if (err.code === '23505') {
         setError('This email is already on the waitlist!');
       } else {
-        setError('Something went wrong. Please try again.');
+        setError(`Error: ${err.message || 'Something went wrong. Please try again.'}`);
       }
     } finally {
       setLoading(false);

@@ -17,13 +17,53 @@ export const AuthProvider = ({ children }) => {
                 .eq('id', authUser.id)
                 .single();
 
-            if (data) {
-                setUser({ ...authUser, ...data });
-            } else {
-                setUser(authUser);
+            const profileExists = !!data;
+            const signupIntent = localStorage.getItem('signup_intent') === 'true';
+
+            // If profile doesn't exist
+            if (!profileExists) {
+                // If they are just "signing in" (no signup intent), reject them
+                if (!signupIntent) {
+                    console.log("No profile found and no signup intent. Rejecting user.");
+                    await supabase.auth.signOut();
+                    setUser(null);
+                    setLoading(false);
+                    // Crucial: use a direct redirect to avoid React state race conditions
+                    window.location.href = window.location.origin + '/login?error=not_registered';
+                    return null;
+                }
+                
+                // If it IS a signup attempt, we create the profile row immediately
+                // This ensures they are "registered" and also sets their initial role
+                const savedRole = localStorage.getItem('signup_role') || 'mentee';
+                
+                const { data: newProfile, error: upsertError } = await supabase
+                    .from('profiles')
+                    .upsert({
+                        id: authUser.id,
+                        full_name: authUser.user_metadata?.full_name || 'User',
+                        email: authUser.email,
+                        role: savedRole,
+                        profile_data: { onboardingCompleted: false }
+                    })
+                    .select()
+                    .single();
+
+                if (upsertError) {
+                    console.error("Error creating initial profile:", upsertError);
+                }
+
+                setUser({ ...authUser, ...newProfile });
+                localStorage.removeItem('signup_intent');
+                localStorage.removeItem('signup_role');
+                setLoading(false);
+                return;
             }
+
+            // Profile exists, we are good to go
+            setUser({ ...authUser, ...data });
         } catch (error) {
-            console.error("Error fetching profile:", error);
+            console.error('Error fetching profile:', error);
             setUser(authUser);
         } finally {
             setLoading(false);
@@ -45,23 +85,16 @@ export const AuthProvider = ({ children }) => {
 
         if (error) throw error;
 
-        // If signup is successful, we might want to update the profile with the full form data
-        // The trigger handles basic fields (id, name, role), but we have extra data in profileData
         if (data.user) {
-            // Update the profile with the rich data (headline, company, etc.)
-            // We store this in the new 'profile_data' JSONB column for flexibility
             const { error: updateError } = await supabase
                 .from('profiles')
                 .update({
                     profile_data: profileData,
-                    country: profileData.country,        // if you want explicit col
-                    language: profileData.language       // if you want explicit col
                 })
                 .eq('id', data.user.id);
 
-            if (updateError) console.error("Error updating profile details:", updateError);
+            if (updateError) console.error('Error updating profile details:', updateError);
 
-            // If session exists (auto-login enabled), fetch full profile
             if (data.session) {
                 await fetchProfile(data.user);
             }
@@ -71,10 +104,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const loginWithEmail = async (email, password) => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         return data.user;
     };
@@ -82,9 +112,7 @@ export const AuthProvider = ({ children }) => {
     const loginWithGoogle = async () => {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
-            options: {
-                redirectTo: `${window.location.origin}/dashboard`
-            }
+            options: { redirectTo: `${window.location.origin}/dashboard` }
         });
         if (error) throw error;
         return data;
@@ -93,44 +121,48 @@ export const AuthProvider = ({ children }) => {
     const loginWithLinkedIn = async () => {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'linkedin',
-            options: {
-                redirectTo: `${window.location.origin}/dashboard`
-            }
+            options: { redirectTo: `${window.location.origin}/dashboard` }
         });
         if (error) throw error;
         return data;
     };
 
     const logout = async () => {
-        if (user && user.id && user.id.startsWith('demo-')) {
+        try {
+            // Add a safety timeout so signOut doesn't hang the UI forever
+            const signOutPromise = supabase.auth.signOut();
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Sign out timed out')), 3000)
+            );
+
+            await Promise.race([signOutPromise, timeoutPromise]);
+        } catch (error) {
+            console.error('Logout error/timeout:', error);
+        } finally {
+            // Always clear state and localStorage even on failure/timeout
             setUser(null);
-            localStorage.removeItem('demo_user');
-            return;
+            localStorage.removeItem('google_calendar_token');
+            localStorage.removeItem('signup_intent');
+            localStorage.removeItem('signup_role');
         }
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-        setUser(null);
     };
 
     useEffect(() => {
-        // Initial Session Check
-        const storedDemoUser = localStorage.getItem('demo_user');
-        if (storedDemoUser) {
-            setUser(JSON.parse(storedDemoUser));
-            setLoading(false);
-            return;
-        }
+        const safetyTimeout = setTimeout(() => setLoading(false), 4000);
 
         supabase.auth.getSession().then(({ data: { session } }) => {
+            clearTimeout(safetyTimeout);
             if (session?.user) {
                 fetchProfile(session.user);
             } else {
                 setUser(null);
                 setLoading(false);
             }
+        }).catch(() => {
+            clearTimeout(safetyTimeout);
+            setLoading(false);
         });
 
-        // Listen for changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (session?.user) {
                 await fetchProfile(session.user);
@@ -140,37 +172,11 @@ export const AuthProvider = ({ children }) => {
             }
         });
 
-        return () => subscription.unsubscribe();
-    }, []);
-
-    const demoLogin = (role) => {
-        const demoUser = {
-            id: `demo-${role}-123`,
-            email: `demo-${role}@example.com`,
-            role: role,
-            fullName: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
-            displayName: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`
+        return () => {
+            clearTimeout(safetyTimeout);
+            subscription.unsubscribe();
         };
-        setUser(demoUser);
-        localStorage.setItem('demo_user', JSON.stringify(demoUser));
-    };
-
-    const toggleRole = async () => {
-        if (!user) return;
-        const newRole = user.role === 'mentor' ? 'mentee' : 'mentor';
-        
-        // Update local state
-        const updatedUser = { ...user, role: newRole };
-        setUser(updatedUser);
-
-        // If it's a demo user, persist to local storage
-        if (user.id?.startsWith('demo-')) {
-            localStorage.setItem('demo_user', JSON.stringify(updatedUser));
-        } else {
-            // Update supabase profiles table so the change persists on reload
-            await supabase.from('profiles').update({ role: newRole }).eq('id', user.id);
-        }
-    };
+    }, []);
 
     const value = {
         user,
@@ -179,14 +185,26 @@ export const AuthProvider = ({ children }) => {
         loginWithEmail,
         loginWithGoogle,
         loginWithLinkedIn,
-        demoLogin,
-        toggleRole,
+        refreshProfile: () => fetchProfile(user),
         logout
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {loading ? (
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    height: '100vh', background: '#0a0a0a', flexDirection: 'column', gap: '12px'
+                }}>
+                    <div style={{
+                        width: '40px', height: '40px', border: '3px solid #333',
+                        borderTop: '3px solid #a78bfa', borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite'
+                    }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>Loading...</p>
+                </div>
+            ) : children}
         </AuthContext.Provider>
     );
 };

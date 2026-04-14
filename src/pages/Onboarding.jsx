@@ -10,19 +10,21 @@ import { ArrowLeft, ArrowRight, Upload, Briefcase, Code, Database, BookOpen, Clo
 import GridPattern from '@/components/ui/grid-pattern';
 
 const Onboarding = () => {
-    const { user } = useAuth();
+    const { user, refreshProfile } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState(null);
 
     const [formData, setFormData] = useState({
         // Step 1: About You
         university: '',
         yearOfStudy: '',
+        currentRole: '', // For mentors
+        currentCompany: '', // For mentors
         location: '',
         linkedin: '',
-        github: '', // Added GitHub
-        photo: null, // Added Photo placeholder
+        github: '',
 
         // Step 2: Skills
         languages: [], // Now objects { name: 'Python', proficiency: 'Beginner' } ? Or just map proficiency separately. 
@@ -38,11 +40,14 @@ const Onboarding = () => {
         primaryGoal: '',
         specificTech: '',
         timeline: '',
+        specializations: [],
+        mentoringStyle: '',
 
         // Step 4: Career & Budget
         careerGoal: [],
         weeklyCommitment: 10, // Added default
         budget: 2000,
+        yearsOfExperience: 1,
     });
 
     const handleChange = (field, value) => {
@@ -53,8 +58,13 @@ const Onboarding = () => {
     const handleBack = () => setStep(prev => prev - 1);
 
     const handleSubmit = async () => {
-        if (!user) return;
+        if (!user) {
+            setErrorMsg("You are not currently logged in. Please sign in via the homepage to save your profile.");
+            return;
+        }
+
         setLoading(true);
+        setErrorMsg(null);
 
         try {
             const { error } = await supabase
@@ -63,12 +73,19 @@ const Onboarding = () => {
                     profile_data: { ...formData, onboardingCompleted: true },
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', user.uid);
+                .eq('id', user.id);
 
+            // Wait, supabase update sometimes returns error=null but updates 0 rows
+            // We should ideally check that a row was updated, but an error means an actual crash (e.g. UUID casting)
             if (error) throw error;
+            
+            // Refresh global user state to recognize onboarding as complete
+            await refreshProfile();
+            
             navigate('/dashboard');
         } catch (error) {
             console.error('Error saving profile:', error);
+            setErrorMsg(error.message || 'Failed to save profile. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -81,40 +98,52 @@ const Onboarding = () => {
                     <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                         <h2 className="text-2xl font-bold">Tell us about yourself</h2>
                         <div className="space-y-4">
-                            {/* Photo Upload UI (Visual only for now) */}
-                            <div className="flex items-center gap-4 p-4 border rounded-lg bg-secondary/10 border-dashed border-secondary">
-                                <div className="h-16 w-16 rounded-full bg-secondary/20 flex items-center justify-center">
-                                    <Upload className="h-6 w-6 text-muted-foreground" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium">Profile Photo</p>
-                                    <p className="text-xs text-muted-foreground">Support for uploading coming soon</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>University / College *</Label>
-                                <Input
-                                    placeholder="e.g. IIT Bombay"
-                                    value={formData.university}
-                                    onChange={e => handleChange('university', e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Year of Study *</Label>
-                                <select
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                    value={formData.yearOfStudy}
-                                    onChange={e => handleChange('yearOfStudy', e.target.value)}
-                                >
-                                    <option value="">Select Year</option>
-                                    <option value="1st Year">1st Year</option>
-                                    <option value="2nd Year">2nd Year</option>
-                                    <option value="3rd Year">3rd Year</option>
-                                    <option value="4th Year">4th Year</option>
-                                    <option value="Graduate">Recent Graduate</option>
-                                </select>
-                            </div>
+                            {user?.role !== 'mentor' ? (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label>University / College *</Label>
+                                        <Input
+                                            placeholder="e.g. IIT Bombay"
+                                            value={formData.university}
+                                            onChange={e => handleChange('university', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Year of Study *</Label>
+                                        <select
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                            value={formData.yearOfStudy}
+                                            onChange={e => handleChange('yearOfStudy', e.target.value)}
+                                        >
+                                            <option value="">Select Year</option>
+                                            <option value="1st Year">1st Year</option>
+                                            <option value="2nd Year">2nd Year</option>
+                                            <option value="3rd Year">3rd Year</option>
+                                            <option value="4th Year">4th Year</option>
+                                            <option value="Graduate">Recent Graduate</option>
+                                        </select>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label>Current Title / Role *</Label>
+                                        <Input
+                                            placeholder="e.g. Senior Software Engineer"
+                                            value={formData.currentRole}
+                                            onChange={e => handleChange('currentRole', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Current Company</Label>
+                                        <Input
+                                            placeholder="e.g. Google or Freelance"
+                                            value={formData.currentCompany}
+                                            onChange={e => handleChange('currentCompany', e.target.value)}
+                                        />
+                                    </div>
+                                </>
+                            )}
                             <div className="space-y-2">
                                 <Label>Location *</Label>
                                 <Input
@@ -295,7 +324,47 @@ const Onboarding = () => {
                 );
 
             case 3:
-                return (
+                return user?.role === 'mentor' ? (
+                    <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                        <h2 className="text-2xl font-bold">Mentoring Areas</h2>
+                        <div className="space-y-4">
+                            <div className="space-y-3">
+                                <Label>Specializations (Select multiple)</Label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {['Frontend', 'Backend', 'Full Stack', 'AI/ML', 'DevOps', 'Mobile', 'System Design', 'Career Growth'].map(goal => (
+                                        <div
+                                            key={goal}
+                                            onClick={() => {
+                                                const newArr = formData.specializations?.includes(goal)
+                                                    ? formData.specializations.filter(g => g !== goal)
+                                                    : [...(formData.specializations || []), goal];
+                                                handleChange('specializations', newArr);
+                                            }}
+                                            className={cn(
+                                                "cursor-pointer p-3 rounded-xl border text-center text-sm transition-all",
+                                                formData.specializations?.includes(goal)
+                                                    ? "bg-primary text-primary-foreground border-primary"
+                                                    : "hover:bg-muted"
+                                            )}
+                                        >
+                                            {goal}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Mentoring Style</Label>
+                                <textarea
+                                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[100px]"
+                                    placeholder="e.g. Hands-on coding, code reviews, career guidance..."
+                                    value={formData.mentoringStyle || ''}
+                                    onChange={e => handleChange('mentoringStyle', e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                ) : (
                     <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                         <h2 className="text-2xl font-bold">Learning Goals</h2>
                         <div className="space-y-4">
@@ -351,7 +420,51 @@ const Onboarding = () => {
                 );
 
             case 4:
-                return (
+                return user?.role === 'mentor' ? (
+                    <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                        <h2 className="text-2xl font-bold">Availability & Experience</h2>
+
+                        <div className="space-y-4">
+                            <div className="flex justify-between">
+                                <Label>Years of Experience</Label>
+                                <span className="text-primary font-bold">{formData.yearsOfExperience || 1} {formData.yearsOfExperience === 1 ? 'year' : 'years'}</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="1"
+                                max="20"
+                                step="1"
+                                value={formData.yearsOfExperience || 1}
+                                onChange={e => handleChange('yearsOfExperience', parseInt(e.target.value))}
+                                className="w-full accent-primary h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>1 year</span>
+                                <span>20+ years</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 pt-4">
+                            <div className="flex justify-between">
+                                <Label>Mentoring Capacity (Hours/Week)</Label>
+                                <span className="text-primary font-bold">{formData.weeklyCommitment} hours/week</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="1"
+                                max="20"
+                                step="1"
+                                value={formData.weeklyCommitment}
+                                onChange={e => handleChange('weeklyCommitment', parseInt(e.target.value))}
+                                className="w-full accent-primary h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>1 hour</span>
+                                <span>20 hours</span>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
                     <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                         <h2 className="text-2xl font-bold">Career & Budget</h2>
 
@@ -442,7 +555,7 @@ const Onboarding = () => {
                     <p className="text-sm text-muted-foreground">Setup your profile</p>
                 </div>
                 <div className="space-y-6">
-                    {['About You', 'Skills', 'Learning Goals', 'Career & Budget'].map((label, idx) => {
+                    {(user?.role === 'mentor' ? ['About You', 'Skills', 'Mentoring Areas', 'Availability'] : ['About You', 'Skills', 'Learning Goals', 'Career & Budget']).map((label, idx) => {
                         const stepNum = idx + 1;
                         const isActive = step === stepNum;
                         const isCompleted = step > stepNum;
@@ -484,25 +597,32 @@ const Onboarding = () => {
                             {renderStep()}
                         </div>
 
-                        <div className="flex justify-between pt-8 mt-4 border-t border-border/50">
-                            <Button
-                                variant="ghost"
-                                onClick={handleBack}
-                                disabled={step === 1}
-                                className={cn(step === 1 && "invisible")}
-                            >
-                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                            </Button>
-
-                            {step < 4 ? (
-                                <Button onClick={handleNext}>
-                                    Next Step <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
-                            ) : (
-                                <Button onClick={handleSubmit} disabled={loading} className="w-32">
-                                    {loading ? 'Saving...' : 'Complete'}
-                                </Button>
+                        <div className="flex flex-col pt-8 mt-4 border-t border-border/50">
+                            {errorMsg && (
+                                <div className="text-red-500 text-sm mb-4 bg-red-500/10 p-3 rounded-lg">
+                                    {errorMsg}
+                                </div>
                             )}
+                            <div className="flex justify-between">
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleBack}
+                                    disabled={step === 1}
+                                    className={cn(step === 1 && "invisible")}
+                                >
+                                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                                </Button>
+
+                                {step < 4 ? (
+                                    <Button onClick={handleNext}>
+                                        Next Step <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Button>
+                                ) : (
+                                    <Button onClick={handleSubmit} disabled={loading} className="w-32">
+                                        {loading ? 'Saving...' : 'Complete'}
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -21,7 +21,17 @@ const COMMON_SKILLS = [
 
 const SignUp = () => {
     const navigate = useNavigate();
-    const { signupWithEmail } = useAuth();
+    const { signupWithEmail, loginWithGoogle } = useAuth();
+
+    const handleGoogleLogin = async () => {
+        try {
+            localStorage.setItem('signup_intent', 'true');
+            localStorage.setItem('signup_role', role);
+            await loginWithGoogle();
+        } catch (error) {
+            setErrors(prev => ({ ...prev, general: "Failed to sign up with Google" }));
+        }
+    };
 
     const [step, setStep] = useState(1);
     const [role, setRole] = useState('mentor');
@@ -372,7 +382,19 @@ const SignUp = () => {
                                 Next Step <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
 
-                            <div className="text-center text-sm text-muted-foreground">
+                            <div className="relative my-4">
+                                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-muted"></span></div>
+                                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or sign up with</span></div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                <Button variant="outline" onClick={handleGoogleLogin} className="flex items-center justify-center gap-2">
+                                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="h-5 w-5" />
+                                    Google
+                                </Button>
+                            </div>
+
+                            <div className="text-center text-sm text-muted-foreground mt-2">
                                 Already have an account? <Link to="/login" className="text-primary font-bold hover:underline">Log In</Link>
                             </div>
                         </div>
