@@ -66,7 +66,7 @@ export default function SignIn() {
             }
             navigate('/dashboard');
         } catch (err) {
-            setError('Failed to sign in with Google');
+            setError(err.message || 'Failed to sign in with Google');
             console.error(err);
         }
     };

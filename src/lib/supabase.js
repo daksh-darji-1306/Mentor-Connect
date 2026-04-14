@@ -15,6 +15,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
         auth: {
             onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
             getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+            signInWithOAuth: () => Promise.reject(new Error("Supabase is not configured. Please check your .env file.")),
         }
     };
 } else {

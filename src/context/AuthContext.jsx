@@ -114,7 +114,10 @@ export const AuthProvider = ({ children }) => {
             provider: 'google',
             options: { redirectTo: `${window.location.origin}/dashboard` }
         });
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase OAuth Error:', error);
+            throw error;
+        }
         return data;
     };
 

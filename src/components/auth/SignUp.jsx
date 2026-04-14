@@ -29,7 +29,8 @@ const SignUp = () => {
             localStorage.setItem('signup_role', role);
             await loginWithGoogle();
         } catch (error) {
-            setErrors(prev => ({ ...prev, general: "Failed to sign up with Google" }));
+            console.error('Signup error:', error);
+            setErrors(prev => ({ ...prev, general: error.message || "Failed to sign up with Google" }));
         }
     };
 
