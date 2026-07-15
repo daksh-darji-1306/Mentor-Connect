@@ -39,6 +39,7 @@ const TopNavigation = () => {
     const navItems = [
         { label: 'Dashboard', path: '/dashboard' },
         { label: 'Sessions', path: '/sessions' },
+        { label: 'Resources', path: '/resources' },
         user?.role === 'mentor' 
             ? { label: 'Mentees', path: '/mentees' }
             : { label: 'Mentors', path: '/mentors' },
@@ -101,16 +102,16 @@ const TopNavigation = () => {
                                 {user?.avatar_url ? (
                                     <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
-                                    user?.fullName ? user.fullName.substring(0, 2) : 'MK'
+                                    (user?.full_name || user?.fullName || user?.email?.split('@')[0] || 'User').substring(0, 2).toUpperCase()
                                 )}
                             </div>
-                            <span className="text-sm font-medium hidden md:block">{user?.fullName || 'User'}</span>
+                            <span className="text-sm font-medium hidden md:block">{user?.full_name || user?.fullName || user?.email?.split('@')[0] || 'User'}</span>
                         </button>
                         
                         {showProfileMenu && (
                             <div className="absolute right-0 mt-2 w-48 bg-card border border-border/50 rounded-xl shadow-lg py-1 z-50 animate-in fade-in slide-in-from-top-2">
                                 <div className="px-4 py-2 border-b border-border/50 mb-1">
-                                    <p className="text-sm font-medium truncate">{user?.fullName || 'User'}</p>
+                                    <p className="text-sm font-medium truncate">{user?.full_name || user?.fullName || user?.email?.split('@')[0] || 'User'}</p>
                                     <p className="text-xs text-muted-foreground truncate">{user?.email || 'user@example.com'}</p>
                                 </div>
                                 <button

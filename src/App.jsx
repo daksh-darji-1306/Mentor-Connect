@@ -21,6 +21,7 @@ import SessionsPage from './pages/SessionsPage';
 import MessagesPage from './pages/MessagesPage';
 import WaitlistModal from './components/WaitlistModal';
 import SettingsPage from './pages/SettingsPage';
+import ResourcesPage from './pages/ResourcesPage';
 
 // Landing Page Wrapper
 
@@ -64,6 +65,7 @@ const AnimatedRoutes = () => {
           <Route path="/mentees" element={<MenteesPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/profile" element={<SettingsPage />} />
         </Route>

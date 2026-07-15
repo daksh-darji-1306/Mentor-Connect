@@ -74,6 +74,7 @@ export default function MenteeDashboard() {
   const [recentActivityList, setRecentActivityList] = useState([]);
   const [heatmapDataList, setHeatmapDataList] = useState([]);
   const [resourcesList, setResourcesList] = useState([]);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   // Dynamic user stats
   const userStats = {
@@ -144,6 +145,11 @@ export default function MenteeDashboard() {
            }
         }
         setMentorsList(mList);
+
+        // Fetch pending requests
+        const pendingQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'pending'));
+        const pendingSnap = await getDocs(pendingQ);
+        setPendingRequestsCount(pendingSnap.docs.length);
 
         // 3. Fetch Resources
         const resQ = query(collection(db, 'resources'), limit(4));
@@ -287,10 +293,30 @@ export default function MenteeDashboard() {
           {/* ══════════════════════ STATS GRID ══════════════════════ */}
           <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: 'Next Session', value: 'Tomorrow', desc: 'with Sarah Chen', icon: Calendar, accent: 'from-sky-500/15 to-blue-500/10', iconColor: 'text-sky-500', border: 'ring-1 ring-white/5', href: '/sessions' },
-              { label: 'Active Projects', value: '3', desc: 'in progress', icon: Folder, accent: 'from-violet-500/15 to-purple-500/10', iconColor: 'text-violet-500', border: 'ring-1 ring-white/5', href: '/mentors' },
-              { label: 'Pending Tasks', value: '7', desc: '2 due today', icon: CheckSquare, accent: 'from-emerald-500/15 to-green-500/10', iconColor: 'text-emerald-500', border: 'ring-1 ring-white/5', href: '/sessions' },
-              { label: 'Messages', value: '4', desc: 'from mentors', icon: MessageSquare, accent: 'from-rose-500/15 to-pink-500/10', iconColor: 'text-rose-500', border: 'ring-1 ring-white/5', href: '/messages' },
+              { 
+                label: 'Next Session', 
+                value: upcomingSessions.length > 0 ? upcomingSessions[0].time.split(' ')[0] : 'None', 
+                desc: upcomingSessions.length > 0 ? `with ${upcomingSessions[0].mentor}` : 'Schedule one now', 
+                icon: Calendar, accent: 'from-sky-500/15 to-blue-500/10', iconColor: 'text-sky-500', border: 'ring-1 ring-white/5', href: '/sessions' 
+              },
+              { 
+                label: 'Mentors Connected', 
+                value: mentorsList.length.toString(), 
+                desc: 'Active mentorships', 
+                icon: Target, accent: 'from-violet-500/15 to-purple-500/10', iconColor: 'text-violet-500', border: 'ring-1 ring-white/5', href: '/mentors' 
+              },
+              { 
+                label: 'Pending Requests', 
+                value: pendingRequestsCount.toString(), 
+                desc: 'Awaiting approval', 
+                icon: CheckSquare, accent: 'from-emerald-500/15 to-green-500/10', iconColor: 'text-emerald-500', border: 'ring-1 ring-white/5', href: '/sessions' 
+              },
+              { 
+                label: 'Learning Resources', 
+                value: resourcesList.length.toString(), 
+                desc: 'Available materials', 
+                icon: BookOpen, accent: 'from-rose-500/15 to-pink-500/10', iconColor: 'text-rose-500', border: 'ring-1 ring-white/5', href: '/resources' 
+              },
             ].map((stat) => (
               <motion.div key={stat.label} variants={fadeUp}>
                 <Link to={stat.href}>

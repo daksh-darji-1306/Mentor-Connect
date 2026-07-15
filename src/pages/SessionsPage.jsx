@@ -17,20 +17,21 @@ const SessionsPage = () => {
         const fetchSessions = async () => {
             setIsLoading(true);
             try {
-                const q = query(
-                    collection(db, 'sessions'),
-                    or(
-                        where('mentor_id', '==', user.id),
-                        where('mentee_id', '==', user.id)
-                    )
-                );
+                    const q = query(
+                        collection(db, 'sessions'),
+                        or(
+                            where('mentor_id', '==', user.id),
+                            where('mentee_id', '==', user.id),
+                            where('status', '==', 'open')
+                        )
+                    );
                 const snapshot = await getDocs(q);
                 const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 if (data) {
                     // Map DB sessions to UI format, filtering out pending requests
                     const formatted = data
-                      .filter(ev => ev.status === 'accepted' || ev.status === 'confirmed')
+                      .filter(ev => ['accepted', 'confirmed', 'open'].includes(ev.status))
                       .map(ev => {
                         const startDate = new Date(ev.start_time);
                         const isMentor = user.id === ev.mentor_id;
@@ -38,7 +39,7 @@ const SessionsPage = () => {
                         
                         return {
                             id: ev.id,
-                            otherPerson: otherPerson || "User",
+                            otherPerson: otherPerson || (ev.status === 'open' ? 'Open Slot' : 'User'),
                             role: isMentor ? "Mentee" : "Mentor",
                             time: startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             day: startDate.getDate(),

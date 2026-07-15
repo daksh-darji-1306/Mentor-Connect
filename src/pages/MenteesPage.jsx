@@ -111,6 +111,12 @@ const MenteesPage = () => {
                     <h3 className="font-bold text-lg text-foreground">No Mentees Yet</h3>
                     <p className="text-muted-foreground max-w-xs mt-1">Once users book sessions or you accept requests, they will appear here to track their progress.</p>
                 </div>
+            ) : filteredMentees.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 text-center bg-secondary/10 rounded-3xl border border-dashed border-border mt-8">
+                    <Search className="w-12 h-12 text-muted-foreground/30 mb-4" />
+                    <h3 className="font-bold text-lg text-foreground">No matching mentees</h3>
+                    <p className="text-muted-foreground max-w-xs mt-1">We couldn't find any of your mentees matching "{searchTerm}".</p>
+                </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {filteredMentees.map((mentee) => {

@@ -9,7 +9,7 @@ import {
     signOut,
     deleteUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
             const profileSnap = await getDoc(profileRef);
 
             const profileExists = profileSnap.exists();
-            const signupIntent = localStorage.getItem('signup_intent') === 'true';
+
 
             // If profile doesn't exist, create a default one (this helps users who deleted their profile but not their auth)
             if (!profileExists) {
@@ -123,6 +123,15 @@ export const AuthProvider = ({ children }) => {
 
     const deleteAccount = async () => {
         if (!auth.currentUser) throw new Error("No user is logged in");
+        
+        // Delete profile from Firestore
+        try {
+            const profileRef = doc(db, 'profiles', auth.currentUser.uid);
+            await deleteDoc(profileRef);
+        } catch (err) {
+            console.error('Error deleting profile:', err);
+        }
+
         await deleteUser(auth.currentUser);
         setUser(null);
         localStorage.removeItem('google_calendar_token');

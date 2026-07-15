@@ -11,7 +11,8 @@ import {
     LogOut,
     ChevronLeft,
     ChevronRight,
-    Menu
+    Menu,
+    BookOpen
 } from 'lucide-react';
 import useSidebarStore from '../../store/useSidebarStore';
 import { useAuth } from '../../context/AuthContext';
@@ -22,8 +23,11 @@ const Sidebar = () => {
 
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-        { icon: Users, label: 'Mentors', path: '/mentors' }, // or /mentees based on role
+        user?.role === 'mentor' 
+            ? { icon: Users, label: 'Mentees', path: '/mentees' }
+            : { icon: Users, label: 'Mentors', path: '/mentors' },
         { icon: Calendar, label: 'Sessions', path: '/sessions' },
+        { icon: BookOpen, label: 'Resources', path: '/resources' },
         { icon: TrendingUp, label: 'Progress', path: '/progress' },
         { icon: MessageSquare, label: 'Community', path: '/community' },
         { icon: Settings, label: 'Settings', path: '/settings' },
@@ -103,15 +107,15 @@ const Sidebar = () => {
             {/* Footer / User Profile */}
             <div className="p-4 border-t border-dashboard-border">
                 <div className={`flex items-center gap-3 p-3 rounded-xl hover:bg-dashboard-cardHover transition-colors cursor-pointer ${isCollapsed ? 'justify-center' : ''}`}>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-lg relative">
-                        MK
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-lg relative uppercase">
+                        {(user?.full_name || user?.fullName || user?.email?.split('@')[0] || 'User').substring(0, 2)}
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-dashboard-card rounded-full"></div>
                     </div>
 
                     {!isCollapsed && (
                         <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-bold text-dashboard-text truncate">Dr. Maria Khan</h4>
-                            <p className="text-xs text-dashboard-textMuted truncate">Senior Data Scientist</p>
+                            <h4 className="text-sm font-bold text-dashboard-text truncate">{user?.full_name || user?.fullName || user?.email?.split('@')[0] || 'User'}</h4>
+                            <p className="text-xs text-dashboard-textMuted truncate capitalize">{user?.role || 'Member'}</p>
                         </div>
                     )}
                 </div>

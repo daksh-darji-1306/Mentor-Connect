@@ -8,115 +8,29 @@ import { cn } from "@/lib/utils";
 import { useCalendar } from '../context/CalendarContext';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import AddSessionModal from '../components/dashboard/AddSessionModal';
 
 const MentorDashboard = () => {
     // Calendar Context & State
-    const navigate = useNavigate();
-    const { token, login, logout, addEvent } = useCalendar();
+    const { token, login, logout } = useCalendar();
     const { user } = useAuth();
-    {/* 1. Header */ }
+    // 1. Header
     const [showAddModal, setShowAddModal] = useState(false);
-    const [sessionTopic, setSessionTopic] = useState('');
-    const [sessionDate, setSessionDate] = useState('');
-    const [sessionTime, setSessionTime] = useState('');
-    const [sessionDuration, setSessionDuration] = useState('60');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    
     // For when accepting a pending request or scheduling specifically for a mentee
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedMentee, setSelectedMentee] = useState(null);
-
-    const handleAddSession = async (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        try {
-            const startDateTime = new Date(`${sessionDate}T${sessionTime}`);
-            const endDateTime = new Date(startDateTime.getTime() + parseInt(sessionDuration) * 60000);
-
-            let googleEventId = 'none';
-            let calendarLink = '';
-
-            if (token) {
-                const event = {
-                    summary: `Mentorship Session: ${sessionTopic}`,
-                    description: 'Scheduled via Mentor-Connect.',
-                    start: {
-                        dateTime: startDateTime.toISOString(),
-                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    },
-                    end: {
-                        dateTime: endDateTime.toISOString(),
-                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    },
-                    conferenceData: {
-                        createRequest: {
-                            requestId: `mentor-connect-${Date.now()}`,
-                            conferenceSolutionKey: { type: 'hangoutsMeet' }
-                        }
-                    }
-                };
-
-                const newEvent = await addEvent(event);
-                if (newEvent) {
-                    googleEventId = newEvent.id || 'none';
-                    calendarLink = newEvent.hangoutLink || newEvent.htmlLink || '';
-                } else {
-                    alert('Failed to add session to Google Calendar. Adding to Database only.');
-                }
-            }
-
-            if (selectedSessionId) {
-                // We are updating an existing pending session request
-                await updateDoc(doc(db, 'sessions', selectedSessionId), {
-                    google_event_id: googleEventId,
-                    start_time: startDateTime.toISOString(),
-                    duration_minutes: parseInt(sessionDuration),
-                    calendar_link: calendarLink,
-                    status: 'accepted'
-                });
-                setSessionRequestsList(prev => prev.filter(s => s.id !== selectedSessionId));
-                alert(token && googleEventId !== 'none' ? 'Session Accepted & Added to Google Calendar!' : 'Session Accepted & Added to Database!');
-            } else {
-                // Insert brand new session to Firestore Database
-                try {
-                    await addDoc(collection(db, 'sessions'), {
-                        google_event_id: googleEventId,
-                        mentor_id: user.id,
-                        mentor_name: user.fullName || 'Mentor',
-                        mentee_id: selectedMentee?.id || null,
-                        mentee_name: selectedMentee?.full_name || null,
-                        topic: sessionTopic,
-                        start_time: startDateTime.toISOString(),
-                        duration_minutes: parseInt(sessionDuration),
-                        calendar_link: calendarLink,
-                        status: selectedMentee ? 'accepted' : 'open'
-                    });
-                    alert(token && googleEventId !== 'none' ? 'Session added to Google Calendar & Database!' : 'Session added to Database!');
-                } catch (dbError) {
-                    console.error("Firestore insert error:", dbError);
-                    alert(`Database Error: ${dbError.message}`);
-                }
-            }
-
-            setShowAddModal(false);
-            setSessionTopic('');
-            setSessionDate('');
-            setSessionTime('');
-            setSelectedSessionId(null);
-            setSelectedMentee(null);
-        } catch (error) {
-            alert('Error adding session');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    const [editingSession, setEditingSession] = useState(null);
 
     const [upcomingSessions, setUpcomingSessions] = useState([]);
     const [requestsList, setRequestsList] = useState([]);
     const [sessionRequestsList, setSessionRequestsList] = useState([]);
-    const [mentorStats, setMentorStats] = useState({ totalMentees: 0, hours: 0, rating: 4.9 });
+    const [mentorStats, setMentorStats] = useState({ totalMentees: 0, hours: 0, rating: "N/A" });
+    const [chartData, setChartData] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const [sessionTopic, setSessionTopic] = useState('');
 
     const handleAcceptSession = (sessionId) => {
         const sessionToAccept = sessionRequestsList.find(s => s.id === sessionId);
@@ -133,6 +47,29 @@ const MentorDashboard = () => {
             await deleteDoc(doc(db, 'sessions', sessionId));
             setSessionRequestsList(prev => prev.filter(s => s.id !== sessionId));
         } catch (err) { console.error("Error rejecting session:", err); }
+    };
+
+    const handleCancelSession = async (sessionId) => {
+        if (!window.confirm("Are you sure you want to cancel this session?")) return;
+        try {
+            await deleteDoc(doc(db, 'sessions', sessionId));
+            setUpcomingSessions(prev => prev.filter(s => s.id !== sessionId));
+        } catch (err) { console.error("Error cancelling session:", err); }
+    };
+
+    const handleAcceptRequest = async (reqId) => {
+        try {
+            await updateDoc(doc(db, 'requests', reqId), { status: 'accepted' });
+            setRequestsList(prev => prev.filter(r => r.id !== reqId));
+            setMentorStats(prev => ({ ...prev, totalMentees: prev.totalMentees + 1 }));
+        } catch (err) { console.error("Error accepting request:", err); }
+    };
+
+    const handleDeclineRequest = async (reqId) => {
+        try {
+            await updateDoc(doc(db, 'requests', reqId), { status: 'declined' });
+            setRequestsList(prev => prev.filter(r => r.id !== reqId));
+        } catch (err) { console.error("Error declining request:", err); }
     };
 
     useEffect(() => {
@@ -172,18 +109,49 @@ const MentorDashboard = () => {
                 
                 let hours = 0;
                 let menteesCount = accSnap.docs.length;
+                const monthlyData = {};
                 
                 sessionSnap.docs.forEach(d => {
                     const s = d.data();
-                    if (s.mentee_id) {
-                        hours += (s.duration_minutes || 60) / 60;
-                        menteesCount++; // simplistic mentees count
+                    if (s.mentee_id && s.status !== 'pending') {
+                        const dur = (s.duration_minutes || 60) / 60;
+                        hours += dur;
+                        
+                        if (s.start_time) {
+                            const date = new Date(s.start_time);
+                            const month = date.toLocaleString('default', { month: 'short' });
+                            monthlyData[month] = (monthlyData[month] || 0) + dur;
+                        }
                     }
                 });
+
+                const cData = [];
+                for (let i = 5; i >= 0; i--) {
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - i);
+                    const month = d.toLocaleString('default', { month: 'short' });
+                    cData.push({ name: month, value: monthlyData[month] || 0 });
+                }
+                setChartData(cData);
+
+                let avgRating = "N/A";
+                try {
+                    const revQ = query(collection(db, 'reviews'), where('mentor_id', '==', user.id));
+                    const revSnap = await getDocs(revQ);
+                    if (!revSnap.empty) {
+                        let totalRating = 0;
+                        revSnap.forEach(r => totalRating += (r.data().rating || 0));
+                        avgRating = (totalRating / revSnap.docs.length).toFixed(1);
+                    }
+                } catch {
+                    console.log("No reviews yet");
+                }
                 
-                setMentorStats({ totalMentees: menteesCount, hours: Math.round(hours), rating: 4.9 });
+                setMentorStats({ totalMentees: menteesCount, hours: Math.round(hours), rating: avgRating });
             } catch (err) {
                 console.error(err);
+            } finally {
+                setLoading(false);
             }
         };
         fetchDashboardData();
@@ -201,23 +169,28 @@ const MentorDashboard = () => {
             try {
                 const q = query(
                     collection(db, 'sessions'),
-                    where('mentor_id', '==', user.id),
-                    where('status', 'in', ['accepted', 'confirmed']),
-                    orderBy('start_time', 'asc'),
-                    limit(4)
+                    where('mentor_id', '==', user.id)
                 );
                 const snapshot = await getDocs(q);
-                const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                let data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                
+                // Filter and sort in memory to avoid requiring a composite index in Firestore
+                data = data
+                    .filter(s => ['accepted', 'confirmed', 'open'].includes(s.status))
+                    .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+                    .filter(s => new Date(s.start_time) >= new Date()) // only future sessions
+                    .slice(0, 4);
 
                 setUpcomingSessions(
                     data.map((ev) => {
                         const startDate = new Date(ev.start_time);
                         return {
                             id: ev.id,
-                            mentee: 'Open Slot', // It's a newly created session slot!
+                            mentee: ev.mentee_name || 'Open Slot',
                             time: `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
                             topic: ev.topic || 'Mentorship Session',
                             link: ev.calendar_link || null,
+                            raw: ev
                         };
                     })
                 );
@@ -228,129 +201,14 @@ const MentorDashboard = () => {
         fetchSessions();
     }, [user?.id, showAddModal]); // Refetch when a new session is added (modal closes)
 
-    
 
-    const MenteesTab = () => {
-        const [mentees, setMentees] = useState([]);
-        const [loading, setLoading] = useState(true);
-
-        useEffect(() => {
-            const fetchMentees = async () => {
-                if (!user?.id) return;
-                try {
-                    // Fetch sessions this mentor has
-                    const sessionsQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id));
-                    const sessionSnap = await getDocs(sessionsQ);
-                    const sessionData = sessionSnap.docs.map(d => d.data()).filter(s => s.mentee_id);
-
-                    // Fetch accepted requests
-                    const requestsQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
-                    const requestSnap = await getDocs(requestsQ);
-                    const requestData = requestSnap.docs.map(d => d.data());
-
-                    // Combine and deduplicate IDs to fetch profiles
-                    const menteeIds = new Set([
-                        ...sessionData.map(s => s.mentee_id),
-                        ...requestData.map(r => r.mentee_id)
-                    ]);
-                    
-                    const menteeMap = new Map();
-                    
-                    for (const mId of menteeIds) {
-                        const profileSnap = await getDoc(doc(db, 'profiles', mId));
-                        if (profileSnap.exists()) {
-                            menteeMap.set(mId, { id: mId, ...profileSnap.data() });
-                        }
-                    }
-
-                    sessionData.forEach(s => {
-                        const profile = menteeMap.get(s.mentee_id);
-                        if (profile) {
-                            menteeMap.set(s.mentee_id, {
-                                ...profile,
-                                source: 'session',
-                                total_sessions: (profile.total_sessions || 0) + 1
-                            });
-                        }
-                    });
-
-                    requestData.forEach(r => {
-                        const profile = menteeMap.get(r.mentee_id);
-                        if (profile) {
-                            menteeMap.set(r.mentee_id, {
-                                ...profile,
-                                source: 'request'
-                            });
-                        }
-                    });
-
-                    setMentees(Array.from(menteeMap.values()));
-                } catch (err) {
-                    console.error("Error fetching mentees:", err);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchMentees();
-        }, []);
-
-        if (loading) return <div className="p-8 text-center text-muted-foreground">Loading mentees...</div>;
-        if (mentees.length === 0) return (
-            <div className="flex flex-col items-center justify-center p-12 text-center bg-secondary/10 rounded-3xl border border-dashed border-border">
-                <Users className="w-12 h-12 text-muted-foreground/30 mb-4" />
-                <h3 className="font-bold text-lg text-foreground">No Mentees Yet</h3>
-                <p className="text-muted-foreground max-w-xs mt-1">Once users book sessions or you accept requests, they will appear here to track their progress.</p>
-            </div>
-        );
-
+    if (loading) {
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {mentees.map((mentee) => {
-                    // Mocked progress for now as per plan
-                    const progress = Math.floor(Math.random() * 60) + 30;
-                    return (
-                        <Card key={mentee.id} className="group hover:border-primary/50 transition-all">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center text-primary font-bold text-xl ring-1 ring-primary/20">
-                                    {mentee.full_name?.charAt(0) || 'M'}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-foreground group-hover:text-primary transition-colors">
-                                        {mentee.full_name}
-                                    </h4>
-                                    <p className="text-xs text-muted-foreground">{mentee.email}</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                                        <span className="text-xs text-foreground font-medium">
-                                            {mentee.total_sessions || 1} Sessions
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button size="sm" variant="ghost" className="h-8 text-xs text-primary hover:bg-primary/5 px-2" onClick={() => {
-                                            setSelectedMentee(mentee);
-                                            setSelectedSessionId(null);
-                                            setSessionTopic('');
-                                            setShowAddModal(true);
-                                        }}>
-                                            Schedule
-                                        </Button>
-                                        <Button onClick={() => navigate('/messages')} size="sm" variant="ghost" className="h-8 text-xs text-primary hover:bg-primary/5 px-2">
-                                            Message <ArrowUpRight className="w-3 h-3 ml-1" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        </Card>
-                    );
-                })}
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
-    };
+    }
 
     return (
         <motion.div
@@ -419,18 +277,40 @@ const MentorDashboard = () => {
                                             <p className="text-xs text-muted-foreground">{session.topic}</p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="text-right flex flex-col items-end gap-2">
                                         <div className="text-sm font-medium text-foreground">{session.time}</div>
-                                        {session.link ? (
-                                            <button
-                                                className="text-xs text-primary hover:underline font-semibold"
-                                                onClick={() => window.open(session.link, '_blank', 'noopener,noreferrer')}
+                                        <div className="flex items-center gap-2">
+                                            {session.link ? (
+                                                <Button
+                                                    size="sm"
+                                                    className="h-7 text-xs px-2"
+                                                    onClick={() => window.open(session.link, '_blank', 'noopener,noreferrer')}
+                                                >
+                                                    Start Meeting
+                                                </Button>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground mr-2 mt-1">No Link</span>
+                                            )}
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-xs px-2 text-blue-500 border-blue-500/20 hover:bg-blue-500/10 hover:text-blue-600"
+                                                onClick={() => {
+                                                    setEditingSession(session.raw);
+                                                    setShowAddModal(true);
+                                                }}
                                             >
-                                                Start Meeting
-                                            </button>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground">No Link</span>
-                                        )}
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                className="h-7 text-xs px-2"
+                                                onClick={() => handleCancelSession(session.id)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -459,8 +339,8 @@ const MentorDashboard = () => {
                                         </div>
                                     </div>
                                     <div className="flex gap-2 w-full md:w-auto">
-                                        <Button size="sm" variant="outline" className="flex-1 md:flex-none">Decline</Button>
-                                        <Button size="sm" className="flex-1 md:flex-none">Accept</Button>
+                                        <Button size="sm" variant="outline" className="flex-1 md:flex-none hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeclineRequest(req.id)}>Decline</Button>
+                                        <Button size="sm" className="flex-1 md:flex-none" onClick={() => handleAcceptRequest(req.id)}>Accept</Button>
                                     </div>
                                 </div>
                             ))}
@@ -494,79 +374,30 @@ const MentorDashboard = () => {
 
                 {/* 3. Sidebar Stats/Chart */}
                 <section className="space-y-6">
-                    <ChartSection data={[
-                        { name: 'Jan', value: 30 }, { name: 'Feb', value: 45 },
-                        { name: 'Mar', value: 60 }, { name: 'Apr', value: 40 },
-                        { name: 'May', value: 75 }, { name: 'Jun', value: 85 }
-                    ]} />
-
+                    <ChartSection data={chartData} />
                 </section>
             </div>
 
             {/* Add Session Modal */}
             <AnimatePresence>
-                {showAddModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-card w-full max-w-md border border-border/50 rounded-xl shadow-2xl overflow-hidden"
-                        >
-                            <div className="flex items-center justify-between p-4 border-b border-border/50">
-                                <h3 className="font-bold text-lg text-foreground">
-                                    {selectedSessionId ? 'Schedule Requested Session' : (selectedMentee ? `Schedule with ${selectedMentee.full_name}` : 'Add New Session')}
-                                </h3>
-                                <Button variant="ghost" size="icon" onClick={() => {
-                                    setShowAddModal(false);
-                                    setSelectedSessionId(null);
-                                    setSelectedMentee(null);
-                                }} className="h-8 w-8 rounded-full">
-                                    <X className="w-4 h-4" />
-                                </Button>
-                            </div>
-                            <form onSubmit={handleAddSession} className="p-4 space-y-4">
-                                <div>
-                                    <label className="text-sm font-medium text-foreground mb-1 block">Session Topic</label>
-                                    <Input required value={sessionTopic} onChange={e => setSessionTopic(e.target.value)} placeholder="e.g. React Pattern Review" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-sm font-medium text-foreground mb-1 block">Date</label>
-                                        <Input required type="date" value={sessionDate} onChange={e => setSessionDate(e.target.value)} />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-foreground mb-1 block">Time</label>
-                                        <Input required type="time" value={sessionTime} onChange={e => setSessionTime(e.target.value)} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-foreground mb-1 block">Duration</label>
-                                    <select
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        value={sessionDuration}
-                                        onChange={e => setSessionDuration(e.target.value)}
-                                    >
-                                        <option value="30">30 minutes</option>
-                                        <option value="60">1 Hour</option>
-                                        <option value="90">1.5 Hours</option>
-                                        <option value="120">2 Hours</option>
-                                    </select>
-                                </div>
-                                <div className="pt-2">
-                                    <Button type="submit" disabled={isSubmitting} className="w-full">
-                                        {isSubmitting ? 'Adding...' : (token ? 'Add to Calendar & Database' : 'Add Session')}
-                                    </Button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </motion.div>
-                )}
+                <AddSessionModal
+                    isOpen={showAddModal}
+                    onClose={() => {
+                        setShowAddModal(false);
+                        setSelectedSessionId(null);
+                        setSelectedMentee(null);
+                        setEditingSession(null);
+                    }}
+                    selectedSessionId={selectedSessionId}
+                    selectedMentee={selectedMentee}
+                    initialTopic={sessionTopic}
+                    editingSession={editingSession}
+                    onSessionAdded={(sessionId) => {
+                        if (sessionId) {
+                            setSessionRequestsList(prev => prev.filter(s => s.id !== sessionId));
+                        }
+                    }}
+                />
             </AnimatePresence>
         </motion.div>
     );
