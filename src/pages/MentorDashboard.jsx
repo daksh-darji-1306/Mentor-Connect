@@ -7,10 +7,13 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useCalendar } from '../context/CalendarContext';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 
 const MentorDashboard = () => {
     // Calendar Context & State
+    const navigate = useNavigate();
     const { token, login, logout, addEvent } = useCalendar();
     const { user } = useAuth();
     {/* 1. Header */ }
@@ -20,6 +23,10 @@ const MentorDashboard = () => {
     const [sessionTime, setSessionTime] = useState('');
     const [sessionDuration, setSessionDuration] = useState('60');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // For when accepting a pending request or scheduling specifically for a mentee
+    const [selectedSessionId, setSelectedSessionId] = useState(null);
+    const [selectedMentee, setSelectedMentee] = useState(null);
 
     const handleAddSession = async (e) => {
         e.preventDefault();
@@ -60,35 +67,45 @@ const MentorDashboard = () => {
                 }
             }
 
-            // Insert to Supabase Database
-            const { error: dbError } = await supabase.from('sessions').insert({
-                google_event_id: googleEventId,
-                mentor_id: user.id,
-                mentor_name: user.fullName || 'Mentor',
-                topic: sessionTopic,
-                start_time: startDateTime.toISOString(),
-                duration_minutes: parseInt(sessionDuration),
-                calendar_link: calendarLink
-            });
-
-            if (dbError) {
-                console.error("Supabase insert error:", dbError);
-                // Give explicit fallback messages if DB wiped or token stale
-                if (dbError.code === '23503') {
-                    alert('Error: Your user profile is missing from the database. Please sign out and sign up again.');
-                } else if (dbError.code === '42501') {
-                    alert('Permission Denied: Database wiped or stale token. Try signing out and back in.');
-                } else {
+            if (selectedSessionId) {
+                // We are updating an existing pending session request
+                await updateDoc(doc(db, 'sessions', selectedSessionId), {
+                    google_event_id: googleEventId,
+                    start_time: startDateTime.toISOString(),
+                    duration_minutes: parseInt(sessionDuration),
+                    calendar_link: calendarLink,
+                    status: 'accepted'
+                });
+                setSessionRequestsList(prev => prev.filter(s => s.id !== selectedSessionId));
+                alert(token && googleEventId !== 'none' ? 'Session Accepted & Added to Google Calendar!' : 'Session Accepted & Added to Database!');
+            } else {
+                // Insert brand new session to Firestore Database
+                try {
+                    await addDoc(collection(db, 'sessions'), {
+                        google_event_id: googleEventId,
+                        mentor_id: user.id,
+                        mentor_name: user.fullName || 'Mentor',
+                        mentee_id: selectedMentee?.id || null,
+                        mentee_name: selectedMentee?.full_name || null,
+                        topic: sessionTopic,
+                        start_time: startDateTime.toISOString(),
+                        duration_minutes: parseInt(sessionDuration),
+                        calendar_link: calendarLink,
+                        status: selectedMentee ? 'accepted' : 'open'
+                    });
+                    alert(token && googleEventId !== 'none' ? 'Session added to Google Calendar & Database!' : 'Session added to Database!');
+                } catch (dbError) {
+                    console.error("Firestore insert error:", dbError);
                     alert(`Database Error: ${dbError.message}`);
                 }
-            } else {
-                setShowAddModal(false);
-                setSessionTopic('');
-                setSessionDate('');
-                setSessionTime('');
-
-                alert(token && googleEventId !== 'none' ? 'Session added to Google Calendar & Database!' : 'Session added to Database!');
             }
+
+            setShowAddModal(false);
+            setSessionTopic('');
+            setSessionDate('');
+            setSessionTime('');
+            setSelectedSessionId(null);
+            setSelectedMentee(null);
         } catch (error) {
             alert('Error adding session');
         } finally {
@@ -96,26 +113,102 @@ const MentorDashboard = () => {
         }
     };
 
-    // Mock Data
-    const stats = [
-        { title: "Total Mentees", value: "12", icon: Users, trend: 15 },
-        { title: "Hours Mentored", value: "245h", icon: Clock, trend: 8 },
-        { title: "Avg. Rating", value: "4.9", icon: Star, trend: 0 },
-    ];
-
     const [upcomingSessions, setUpcomingSessions] = useState([]);
+    const [requestsList, setRequestsList] = useState([]);
+    const [sessionRequestsList, setSessionRequestsList] = useState([]);
+    const [mentorStats, setMentorStats] = useState({ totalMentees: 0, hours: 0, rating: 4.9 });
+
+    const handleAcceptSession = (sessionId) => {
+        const sessionToAccept = sessionRequestsList.find(s => s.id === sessionId);
+        if (sessionToAccept) {
+            setSelectedSessionId(sessionId);
+            setSelectedMentee({ id: sessionToAccept.mentee_id, full_name: sessionToAccept.mentee_name });
+            setSessionTopic(sessionToAccept.topic || '');
+            setShowAddModal(true);
+        }
+    };
+
+    const handleRejectSession = async (sessionId) => {
+        try {
+            await deleteDoc(doc(db, 'sessions', sessionId));
+            setSessionRequestsList(prev => prev.filter(s => s.id !== sessionId));
+        } catch (err) { console.error("Error rejecting session:", err); }
+    };
+
+    useEffect(() => {
+        if (!user?.id) return;
+        const fetchDashboardData = async () => {
+            try {
+                // Fetch pending requests
+                const reqQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
+                const reqSnap = await getDocs(reqQ);
+                const rList = [];
+                for (const r of reqSnap.docs) {
+                    const data = r.data();
+                    const profileDoc = await getDoc(doc(db, 'profiles', data.mentee_id));
+                    if (profileDoc.exists()) {
+                        const p = profileDoc.data();
+                        rList.push({
+                           id: r.id,
+                           name: p.full_name || p.email.split('@')[0],
+                           role: p.profile_data?.currentRole || 'Mentee',
+                           message: data.message || "Hi, I'd like to connect!"
+                        });
+                    }
+                }
+                setRequestsList(rList);
+
+                // Fetch pending session requests
+                const sessReqQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
+                const sessReqSnap = await getDocs(sessReqQ);
+                setSessionRequestsList(sessReqSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+                // Fetch stats (accepted requests + sessions)
+                const accQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
+                const accSnap = await getDocs(accQ);
+                
+                const sessionQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id));
+                const sessionSnap = await getDocs(sessionQ);
+                
+                let hours = 0;
+                let menteesCount = accSnap.docs.length;
+                
+                sessionSnap.docs.forEach(d => {
+                    const s = d.data();
+                    if (s.mentee_id) {
+                        hours += (s.duration_minutes || 60) / 60;
+                        menteesCount++; // simplistic mentees count
+                    }
+                });
+                
+                setMentorStats({ totalMentees: menteesCount, hours: Math.round(hours), rating: 4.9 });
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchDashboardData();
+    }, [user?.id]);
+
+    const stats = [
+        { title: "Total Mentees", value: mentorStats.totalMentees.toString(), icon: Users, trend: 15 },
+        { title: "Hours Mentored", value: mentorStats.hours.toString() + "h", icon: Clock, trend: 8 },
+        { title: "Avg. Rating", value: mentorStats.rating.toString(), icon: Star, trend: 0 },
+    ];
 
     useEffect(() => {
         if (!user?.id) return;
         const fetchSessions = async () => {
-            const { data, error } = await supabase
-                .from('sessions')
-                .select('*')
-                .eq('mentor_id', user.id)
-                .order('start_time', { ascending: true })
-                .limit(4);
+            try {
+                const q = query(
+                    collection(db, 'sessions'),
+                    where('mentor_id', '==', user.id),
+                    where('status', 'in', ['accepted', 'confirmed']),
+                    orderBy('start_time', 'asc'),
+                    limit(4)
+                );
+                const snapshot = await getDocs(q);
+                const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-            if (data) {
                 setUpcomingSessions(
                     data.map((ev) => {
                         const startDate = new Date(ev.start_time);
@@ -128,15 +221,14 @@ const MentorDashboard = () => {
                         };
                     })
                 );
+            } catch (error) {
+                console.error('Error fetching sessions:', error);
             }
         };
         fetchSessions();
     }, [user?.id, showAddModal]); // Refetch when a new session is added (modal closes)
 
-    const requests = [
-        { name: "Jordan Lee", role: "Junior Dev", message: "Looking for guidance in System Design..." },
-        { name: "Casey West", role: "Student", message: "Help pivoting from Marketing to UX..." },
-    ];
+    
 
     const MenteesTab = () => {
         const [mentees, setMentees] = useState([]);
@@ -146,38 +238,47 @@ const MentorDashboard = () => {
             const fetchMentees = async () => {
                 if (!user?.id) return;
                 try {
-                    // 1. Fetch sessions this mentor has where someone has booked
-                    const { data: sessionData } = await supabase
-                        .from('sessions')
-                        .select('booked_by, profiles!booked_by(*)')
-                        .eq('mentor_id', user.id)
-                        .not('booked_by', 'is', null);
+                    // Fetch sessions this mentor has
+                    const sessionsQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id));
+                    const sessionSnap = await getDocs(sessionsQ);
+                    const sessionData = sessionSnap.docs.map(d => d.data()).filter(s => s.mentee_id);
 
-                    // 2. Fetch accepted requests
-                    const { data: requestData } = await supabase
-                        .from('requests')
-                        .select('mentee_id, profiles!mentee_id(*)')
-                        .eq('mentor_id', user.id)
-                        .eq('status', 'accepted');
+                    // Fetch accepted requests
+                    const requestsQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
+                    const requestSnap = await getDocs(requestsQ);
+                    const requestData = requestSnap.docs.map(d => d.data());
 
-                    // Combine and deduplicate
+                    // Combine and deduplicate IDs to fetch profiles
+                    const menteeIds = new Set([
+                        ...sessionData.map(s => s.mentee_id),
+                        ...requestData.map(r => r.mentee_id)
+                    ]);
+                    
                     const menteeMap = new Map();
+                    
+                    for (const mId of menteeIds) {
+                        const profileSnap = await getDoc(doc(db, 'profiles', mId));
+                        if (profileSnap.exists()) {
+                            menteeMap.set(mId, { id: mId, ...profileSnap.data() });
+                        }
+                    }
 
-                    sessionData?.forEach(s => {
-                        if (s.profiles) {
-                            menteeMap.set(s.booked_by, {
-                                ...s.profiles,
+                    sessionData.forEach(s => {
+                        const profile = menteeMap.get(s.mentee_id);
+                        if (profile) {
+                            menteeMap.set(s.mentee_id, {
+                                ...profile,
                                 source: 'session',
-                                total_sessions: (menteeMap.get(s.booked_by)?.total_sessions || 0) + 1
+                                total_sessions: (profile.total_sessions || 0) + 1
                             });
                         }
                     });
 
-                    requestData?.forEach(r => {
-                        if (r.profiles) {
+                    requestData.forEach(r => {
+                        const profile = menteeMap.get(r.mentee_id);
+                        if (profile) {
                             menteeMap.set(r.mentee_id, {
-                                ...r.profiles,
-                                ...(menteeMap.get(r.mentee_id) || {}),
+                                ...profile,
                                 source: 'request'
                             });
                         }
@@ -223,29 +324,25 @@ const MentorDashboard = () => {
 
                             <div className="space-y-4">
                                 <div>
-                                    <div className="flex items-center justify-between text-xs mb-1.5">
-                                        <span className="text-muted-foreground font-medium">Learning Progress</span>
-                                        <span className="text-primary font-bold">{progress}%</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-secondary/50 rounded-full overflow-hidden">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${progress}%` }}
-                                            className="h-full bg-primary rounded-full transition-all"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between pt-2 border-t border-border/40">
                                     <div className="flex items-center gap-2">
                                         <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                                         <span className="text-xs text-foreground font-medium">
                                             {mentee.total_sessions || 1} Sessions
                                         </span>
                                     </div>
-                                    <Button size="sm" variant="ghost" className="h-8 text-xs text-primary hover:bg-primary/5 px-3">
-                                        Message <ArrowUpRight className="w-3 h-3 ml-1" />
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="ghost" className="h-8 text-xs text-primary hover:bg-primary/5 px-2" onClick={() => {
+                                            setSelectedMentee(mentee);
+                                            setSelectedSessionId(null);
+                                            setSessionTopic('');
+                                            setShowAddModal(true);
+                                        }}>
+                                            Schedule
+                                        </Button>
+                                        <Button onClick={() => navigate('/messages')} size="sm" variant="ghost" className="h-8 text-xs text-primary hover:bg-primary/5 px-2">
+                                            Message <ArrowUpRight className="w-3 h-3 ml-1" />
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </Card>
@@ -268,7 +365,12 @@ const MentorDashboard = () => {
                         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
                         <p className="text-muted-foreground">Welcome back! Here's your mentorship overview.</p>
                     </div>
-                    <Button onClick={() => setShowAddModal(true)} variant="outline" size="sm" className="h-9">
+                    <Button onClick={() => {
+                        setSelectedMentee(null);
+                        setSelectedSessionId(null);
+                        setSessionTopic('');
+                        setShowAddModal(true);
+                    }} variant="outline" size="sm" className="h-9">
                         <Calendar className="w-4 h-4 mr-2" /> Add Session Slot
                     </Button>
                 </div>
@@ -347,7 +449,7 @@ const MentorDashboard = () => {
                             <span className="text-xs text-muted-foreground">Recent requests</span>
                         </div>
                         <div className="space-y-4">
-                            {requests.map((req, i) => (
+                            {requestsList.map((req, i) => (
                                 <div key={i} className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-b last:border-0 border-border/50 pb-4 last:pb-0">
                                     <div className="flex gap-3">
                                         <div className="w-10 h-10 rounded-full bg-secondary flex-shrink-0" />
@@ -362,6 +464,30 @@ const MentorDashboard = () => {
                                     </div>
                                 </div>
                             ))}
+
+                            {sessionRequestsList.map((req, i) => {
+                                return (
+                                <div key={`sess-${i}`} className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-b last:border-0 border-border/50 pb-4 last:pb-0">
+                                    <div className="flex gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center flex-shrink-0 font-bold">
+                                            {req.mentee_name ? req.mentee_name[0].toUpperCase() : 'M'}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-sm text-foreground">{req.mentee_name || 'Mentee'} <span className="text-xs font-normal text-muted-foreground">• Session Request</span></h4>
+                                            <p className="text-sm text-muted-foreground line-clamp-1">{req.topic} | Needs Scheduling</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                        <Button size="sm" variant="outline" className="flex-1 md:flex-none hover:bg-destructive/10 hover:text-destructive" onClick={() => handleRejectSession(req.id)}>Reject</Button>
+                                        <Button size="sm" className="flex-1 md:flex-none" onClick={() => handleAcceptSession(req.id)}>Accept</Button>
+                                    </div>
+                                </div>
+                                );
+                            })}
+                            
+                            {(requestsList.length === 0 && sessionRequestsList.length === 0) && (
+                                <p className="text-sm text-muted-foreground py-4 text-center">No pending requests right now.</p>
+                            )}
                         </div>
                     </Card>
                 </section>
@@ -374,21 +500,6 @@ const MentorDashboard = () => {
                         { name: 'May', value: 75 }, { name: 'Jun', value: 85 }
                     ]} />
 
-                    <Card className="bg-gradient-to-br from-primary/90 to-violet-600 text-primary-foreground border-none">
-                        <div className="flex items-start justify-between mb-8">
-                            <div>
-                                <h3 className="text-lg font-bold opacity-90">Earnings</h3>
-                                <p className="text-sm opacity-70">This Month</p>
-                            </div>
-                            <div className="p-2 bg-white/10 rounded-lg">
-                                <ArrowUpRight className="w-5 h-5" />
-                            </div>
-                        </div>
-                        <div className="text-4xl font-bold mb-2">$1,250</div>
-                        <div className="flex items-center gap-2 text-sm opacity-80">
-                            <CheckCircle2 className="w-4 h-4" /> Payout scheduled for 1st
-                        </div>
-                    </Card>
                 </section>
             </div>
 
@@ -408,8 +519,14 @@ const MentorDashboard = () => {
                             className="bg-card w-full max-w-md border border-border/50 rounded-xl shadow-2xl overflow-hidden"
                         >
                             <div className="flex items-center justify-between p-4 border-b border-border/50">
-                                <h3 className="font-bold text-lg text-foreground">Add New Session</h3>
-                                <Button variant="ghost" size="icon" onClick={() => setShowAddModal(false)} className="h-8 w-8 rounded-full">
+                                <h3 className="font-bold text-lg text-foreground">
+                                    {selectedSessionId ? 'Schedule Requested Session' : (selectedMentee ? `Schedule with ${selectedMentee.full_name}` : 'Add New Session')}
+                                </h3>
+                                <Button variant="ghost" size="icon" onClick={() => {
+                                    setShowAddModal(false);
+                                    setSelectedSessionId(null);
+                                    setSelectedMentee(null);
+                                }} className="h-8 w-8 rounded-full">
                                     <X className="w-4 h-4" />
                                 </Button>
                             </div>
@@ -453,12 +570,6 @@ const MentorDashboard = () => {
             </AnimatePresence>
         </motion.div>
     );
-};
-
-const MenteesTab = () => {
-    // Moved logic into separate file or component if still needed, 
-    // but the main Mentee list is now in MenteesPage.jsx
-    return null;
 };
 
 export default MentorDashboard;

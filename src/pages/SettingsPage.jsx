@@ -7,7 +7,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { setPreference, getPreference } from '../utils/cookieManager';
 import { useNavigate } from 'react-router-dom';
 
@@ -116,7 +117,7 @@ function DeleteAccountModal({ onCancel, onConfirm, isDeleting }) {
 
 // ── Main Settings Page ───────────────────────────────────────────
 export default function SettingsPage() {
-    const { user, logout } = useAuth();
+    const { user, logout, deleteAccount } = useAuth();
     const navigate = useNavigate();
     const [activeTab, setActiveTab]       = useState('profile');
     const [isSaving, setIsSaving]         = useState(false);
@@ -151,7 +152,7 @@ export default function SettingsPage() {
         setIsSaving(true);
         try {
             if (user?.id) {
-                await supabase.from('profiles').update({
+                await updateDoc(doc(db, 'profiles', user.id), {
                     full_name: fullName,
                     profile_data: {
                         ...(user.profile_data || {}),
@@ -160,7 +161,7 @@ export default function SettingsPage() {
                         bio,
                         location,
                     },
-                }).eq('id', user.id);
+                });
             }
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
@@ -176,27 +177,18 @@ export default function SettingsPage() {
         setIsDeleting(true);
         setDeleteError('');
         try {
-            // Call the SQL RPC function to hard-delete from all tables and auth.users
-            const { error: rpcError } = await supabase.rpc('delete_user');
-            
-            if (rpcError) {
-                console.error('RPC Error:', rpcError);
-                // 42883 is the Postgres error code for "function does not exist"
-                if (rpcError.code === '42883' || rpcError.message?.includes('not found')) {
-                    setDeleteError('Delete function not found in database. Did you run the SQL script in Supabase?');
-                } else {
-                    setDeleteError(`Database error: ${rpcError.message}`);
-                }
-                setIsDeleting(false);
-                return;
-            }
+            await deleteDoc(doc(db, 'profiles', user.id));
+            await deleteAccount();
 
             // Sign out and redirect
-            await logout();
             navigate('/');
         } catch (err) {
             console.error('Delete account error:', err);
-            setDeleteError('A network error occurred. Please check your connection and try again.');
+            if (err.code === 'auth/requires-recent-login') {
+                setDeleteError('For security reasons, you must log out and log back in before deleting your account.');
+            } else {
+                setDeleteError('A network error occurred. Please check your connection and try again.');
+            }
             setIsDeleting(false);
         }
     };

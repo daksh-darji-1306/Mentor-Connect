@@ -28,6 +28,7 @@ const SignUp = () => {
             localStorage.setItem('signup_intent', 'true');
             localStorage.setItem('signup_role', role);
             await loginWithGoogle();
+            navigate('/onboarding');
         } catch (error) {
             console.error('Signup error:', error);
             setErrors(prev => ({ ...prev, general: error.message || "Failed to sign up with Google" }));
@@ -137,8 +138,8 @@ const SignUp = () => {
         } catch (error) {
             console.error(error);
             // Handle specific Firebase errors if needed
-            if (error.message.includes('already registered') || error.message.includes('unique constraint')) {
-                setErrors(prev => ({ ...prev, email: 'Email is already registered' }));
+            if (error.code === 'auth/email-already-in-use' || error.message.includes('already-in-use') || error.message.includes('already registered') || error.message.includes('unique constraint')) {
+                setErrors(prev => ({ ...prev, email: 'Email is already registered. Please log in.' }));
                 setStep(1);
             } else {
                 setErrors(prev => ({ ...prev, general: error.message }));

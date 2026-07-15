@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,17 +68,10 @@ const Onboarding = () => {
         setErrorMsg(null);
 
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    profile_data: { ...formData, onboardingCompleted: true },
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', user.id);
-
-            // Wait, supabase update sometimes returns error=null but updates 0 rows
-            // We should ideally check that a row was updated, but an error means an actual crash (e.g. UUID casting)
-            if (error) throw error;
+            await updateDoc(doc(db, 'profiles', user.id), {
+                profile_data: { ...formData, onboardingCompleted: true },
+                updated_at: new Date().toISOString()
+            });
             
             // Refresh global user state to recognize onboarding as complete
             await refreshProfile();

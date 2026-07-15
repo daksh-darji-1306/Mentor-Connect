@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2, CheckCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -70,36 +71,34 @@ const WaitlistModal = ({ isOpen, onClose }) => {
     setError('');
 
     try {
-      // Prepare data for submission
-      // Assuming 'details' column is JSONB to store extra fields
-      const { data, error } = await supabase
-        .from('waitlist')
-        .insert([
-          {
-            name: formData.name,
-            email: formData.email,
-            role: formData.role,
-            phone: formData.phone,
-            university: formData.role === 'student' ? formData.university : null,
-            year_of_study: formData.role === 'student' ? formData.yearOfStudy : null,
-            mentor_role: formData.role === 'mentor' ? formData.currentRole : null,
-            experience: formData.role === 'mentor' ? formData.experience : null,
-            skills: formData.skills,
-            referral_source: formData.referral,
-            created_at: new Date().toISOString(),
-          }
-        ]);
+      const waitlistRef = collection(db, 'waitlist');
+      const q = query(waitlistRef, where('email', '==', formData.email));
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        setError('This email is already on the waitlist!');
+        setLoading(false);
+        return;
+      }
 
-      if (error) throw error;
+      await addDoc(waitlistRef, {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        phone: formData.phone,
+        university: formData.role === 'student' ? formData.university : null,
+        year_of_study: formData.role === 'student' ? formData.yearOfStudy : null,
+        mentor_role: formData.role === 'mentor' ? formData.currentRole : null,
+        experience: formData.role === 'mentor' ? formData.experience : null,
+        skills: formData.skills,
+        referral_source: formData.referral,
+        created_at: new Date().toISOString(),
+      });
+
       setSuccess(true);
     } catch (err) {
       console.error('Error adding to waitlist:', err);
-      // Handle unique violation or other errors
-      if (err.code === '23505') {
-        setError('This email is already on the waitlist!');
-      } else {
-        setError(`Error: ${err.message || 'Something went wrong. Please try again.'}`);
-      }
+      setError(`Error: ${err.message || 'Something went wrong. Please try again.'}`);
     } finally {
       setLoading(false);
     }

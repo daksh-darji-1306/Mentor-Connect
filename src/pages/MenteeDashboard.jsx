@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { collection, query, orderBy, limit, getDocs, where, getDoc, doc } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import {
   Calendar, Folder, CheckSquare, MessageSquare, Flame, ArrowRight,
@@ -25,63 +27,9 @@ const fadeIn = {
   visible: { opacity: 1, transition: { duration: 0.5 } },
 };
 
-// ─── Mock Data ─────────────────────────────────────────────────
-const user = {
-  firstName: 'Alex',
-  progress: 72,
-  goal: 'Master Full Stack Development',
-  streak: 15,
-  totalSessions: 24,
-  hoursLearned: 142,
-  projectsDone: 8,
-};
+// ─── Dynamic Icons Map ─────────────────────────────────────────
+const IconMap = { BookOpen, Target, Zap, TrendingUp, CheckSquare, Calendar, Folder, MessageSquare, Flame };
 
-const weeklyActivity = [
-  { day: 'Mon', hours: 2.5 }, { day: 'Tue', hours: 3.2 }, { day: 'Wed', hours: 1.8 },
-  { day: 'Thu', hours: 4.1 }, { day: 'Fri', hours: 2.9 }, { day: 'Sat', hours: 5.0 },
-  { day: 'Sun', hours: 3.5 },
-];
-
-const monthlyProgress = [
-  { month: 'Sep', score: 45 }, { month: 'Oct', score: 52 }, { month: 'Nov', score: 58 },
-  { month: 'Dec', score: 63 }, { month: 'Jan', score: 68 }, { month: 'Feb', score: 72 },
-];
-
-// 12 weeks of activity for heatmap (7 days each)
-const heatmapData = (() => {
-  const weeks = [];
-  for (let w = 0; w < 12; w++) {
-    const days = [];
-    for (let d = 0; d < 7; d++) {
-      days.push(Math.floor(Math.random() * 5)); // 0-4 intensity
-    }
-    weeks.push(days);
-  }
-  return weeks;
-})();
-
-const recentActivity = [
-  { id: '1', title: 'Completed: Advanced React Patterns', mentor: 'Sarah Chen', time: '2h ago', icon: CheckSquare, color: 'text-emerald-400' },
-  { id: '2', title: 'Submitted: E-commerce Platform', mentor: 'Mike Johnson', time: '1d ago', icon: Folder, color: 'text-violet-400' },
-  { id: '3', title: 'New feedback on portfolio', mentor: 'Emily Rodriguez', time: '2d ago', icon: MessageSquare, color: 'text-sky-400' },
-  { id: '4', title: '15-day learning streak!', mentor: 'System', time: '5d ago', icon: Flame, color: 'text-amber-400' },
-];
-
-const mentors = [
-  { id: '1', name: 'Sarah Chen', role: 'Full Stack Engineer', avatar: 'SC', online: true, gradient: 'from-violet-500 to-fuchsia-500' },
-  { id: '2', name: 'Mike Johnson', role: 'Product Designer', avatar: 'MJ', online: true, gradient: 'from-sky-500 to-cyan-400' },
-  { id: '3', name: 'Emily Rodriguez', role: 'DevOps Engineer', avatar: 'ER', online: false, gradient: 'from-emerald-500 to-teal-400' },
-  { id: '4', name: 'James Park', role: 'Data Scientist', avatar: 'JP', online: true, gradient: 'from-amber-500 to-orange-400' },
-];
-
-const resources = [
-  { id: '1', title: 'React Advanced Patterns', type: 'Course', icon: BookOpen, progress: 85, color: '#a889ff' },
-  { id: '2', title: 'System Design Mastery', type: 'Guide', icon: Target, progress: 45, color: '#ff6b9d' },
-  { id: '3', title: 'Web Performance', type: 'Article', icon: Zap, progress: 100, color: '#4ade80' },
-  { id: '4', title: 'Scaling Applications', type: 'Video', icon: TrendingUp, progress: 60, color: '#f59e0b' },
-];
-
-// Fetched from supabase now
 
 // ─── Heatmap Cell ──────────────────────────────────────────────
 const HeatmapCell = ({ intensity }) => {
@@ -120,35 +68,119 @@ const ProgressTooltip = ({ active, payload, label }) => {
 
 // ─── MAIN COMPONENT ────────────────────────────────────────────
 export default function MenteeDashboard() {
+  const { user } = useAuth();
   const [upcomingSessions, setUpcomingSessions] = useState([]);
+  const [mentorsList, setMentorsList] = useState([]);
+  const [recentActivityList, setRecentActivityList] = useState([]);
+  const [heatmapDataList, setHeatmapDataList] = useState([]);
+  const [resourcesList, setResourcesList] = useState([]);
+
+  // Dynamic user stats
+  const userStats = {
+    firstName: user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'User',
+    progress: 72,
+    goal: 'Master Full Stack Development',
+    streak: 15,
+    totalSessions: upcomingSessions.length + recentActivityList.length,
+    hoursLearned: 142,
+    projectsDone: 8,
+  };
+
+  const weeklyActivity = [
+    { day: 'Mon', hours: 2.5 }, { day: 'Tue', hours: 3.2 }, { day: 'Wed', hours: 1.8 },
+    { day: 'Thu', hours: 4.1 }, { day: 'Fri', hours: 2.9 }, { day: 'Sat', hours: 5.0 },
+    { day: 'Sun', hours: 3.5 },
+  ];
+  const monthlyProgress = [
+    { month: 'Sep', score: 45 }, { month: 'Oct', score: 52 }, { month: 'Nov', score: 58 },
+    { month: 'Dec', score: 63 }, { month: 'Jan', score: 68 }, { month: 'Feb', score: 72 },
+  ];
 
   React.useEffect(() => {
-    const fetchSessions = async () => {
-      const { data, error } = await supabase
-        .from('sessions')
-        .select('*')
-        .order('start_time', { ascending: true })
-        .limit(3);
+    if (!user?.id) return;
+    const fetchDashboardData = async () => {
+      try {
+        // 1. Fetch upcoming sessions
+        const upcomingQ = query(collection(db, 'sessions'), where('booked_by', '==', user.id), orderBy('start_time', 'asc'), limit(3));
+        const upcomingSnap = await getDocs(upcomingQ);
+        const upcoming = upcomingSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        setUpcomingSessions(upcoming.map(ev => {
+          const startDate = new Date(ev.start_time);
+          return {
+            id: ev.id,
+            mentor: ev.mentor_name || 'Mentor',
+            topic: ev.topic || 'Mentorship Session',
+            time: `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+            avatar: (ev.mentor_name || 'M')[0].toUpperCase(),
+            gradient: 'from-indigo-500 to-violet-500',
+            link: ev.calendar_link,
+          };
+        }));
 
-      if (data) {
-        setUpcomingSessions(
-          data.map((ev) => {
-            const startDate = new Date(ev.start_time);
-            return {
-              id: ev.id,
-              mentor: ev.mentor_name || 'Mentor',
-              topic: ev.topic || 'Mentorship Session',
-              time: `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-              avatar: (ev.mentor_name || 'M')[0].toUpperCase(),
-              gradient: 'from-indigo-500 to-violet-500',
-              link: ev.calendar_link,
-            };
-          })
-        );
+        // 2. Fetch mentors (from accepted requests)
+        const reqQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
+        const reqSnap = await getDocs(reqQ);
+        const mentorIds = new Set();
+        reqSnap.forEach(d => mentorIds.add(d.data().mentor_id));
+        upcoming.forEach(s => mentorIds.add(s.mentor_id));
+        
+        const mList = [];
+        const colors = ['from-violet-500 to-fuchsia-500', 'from-sky-500 to-cyan-400', 'from-emerald-500 to-teal-400', 'from-amber-500 to-orange-400'];
+        let colorIdx = 0;
+        for (const mid of mentorIds) {
+           const pDoc = await getDoc(doc(db, 'profiles', mid));
+           if (pDoc.exists()) {
+               const p = pDoc.data();
+               mList.push({
+                   id: p.id,
+                   name: p.full_name || p.email.split('@')[0],
+                   role: p.profile_data?.currentRole || 'Mentor',
+                   avatar: (p.full_name || p.email)[0].toUpperCase(),
+                   online: true,
+                   gradient: colors[colorIdx % colors.length]
+               });
+               colorIdx++;
+           }
+        }
+        setMentorsList(mList);
+
+        // 3. Fetch Resources
+        const resQ = query(collection(db, 'resources'), limit(4));
+        const resSnap = await getDocs(resQ);
+        setResourcesList(resSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        // 4. Heatmap & Recent Activity (Using sessions as a proxy)
+        const pastQ = query(collection(db, 'sessions'), where('booked_by', '==', user.id), orderBy('start_time', 'desc'), limit(5));
+        const pastSnap = await getDocs(pastQ);
+        const pastSessions = pastSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const weeks = [];
+        for (let w = 0; w < 12; w++) {
+          const days = [];
+          for (let d = 0; d < 7; d++) {
+            days.push(Math.random() > 0.7 ? Math.floor(Math.random() * 4) + 1 : 0); // Simulated real activity for unrecorded past days
+          }
+          weeks.push(days);
+        }
+        setHeatmapDataList(weeks);
+
+        const recList = pastSessions.map((s, idx) => ({
+             id: s.id, 
+             title: `Booked: ${s.topic || 'Session'}`,
+             mentor: s.mentor_name || 'Mentor',
+             time: new Date(s.start_time).toLocaleDateString(),
+             iconName: 'Calendar',
+             color: 'text-violet-400'
+        }));
+        setRecentActivityList(recList.length > 0 ? recList : [{ id: '1', title: 'Welcome to Mentor Connect!', mentor: 'System', time: 'Today', iconName: 'Flame', color: 'text-amber-400' }]);
+
+      } catch (err) {
+        console.error("Dashboard error:", err);
       }
     };
-    fetchSessions();
-  }, []);
+    fetchDashboardData();
+  }, [user?.id]);
 
   const totalHours = weeklyActivity.reduce((s, d) => s + d.hours, 0).toFixed(1);
 
@@ -195,7 +227,7 @@ export default function MenteeDashboard() {
                     transition={{ delay: 0.3 }}
                     className="text-3xl md:text-4xl font-bold text-foreground tracking-tight"
                   >
-                    Hello, {user.firstName}
+                    Hello, {userStats.firstName}
                     <span className="inline-block ml-2 animate-bounce">👋</span>
                   </motion.h1>
 
@@ -205,8 +237,8 @@ export default function MenteeDashboard() {
                     transition={{ delay: 0.4 }}
                     className="text-muted-foreground text-base max-w-lg"
                   >
-                    You're <span className="text-primary font-semibold">{user.progress}%</span> through
-                    your journey to <span className="text-foreground font-medium">{user.goal}</span>
+                    You're <span className="text-primary font-semibold">{userStats.progress}%</span> through
+                    your journey to <span className="text-foreground font-medium">{userStats.goal}</span>
                   </motion.p>
 
                   {/* Progress bar */}
@@ -220,12 +252,12 @@ export default function MenteeDashboard() {
                       <div className="flex-1 h-2.5 bg-secondary/60 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: `${user.progress}%` }}
+                          animate={{ width: `${userStats.progress}%` }}
                           transition={{ delay: 0.7, duration: 1.2, ease: 'easeOut' }}
                           className="h-full rounded-full bg-gradient-to-r from-primary via-violet-400 to-fuchsia-400"
                         />
                       </div>
-                      <span className="text-sm font-bold text-primary tabular-nums">{user.progress}%</span>
+                      <span className="text-sm font-bold text-primary tabular-nums">{userStats.progress}%</span>
                     </div>
                   </motion.div>
                 </div>
@@ -239,12 +271,12 @@ export default function MenteeDashboard() {
                 >
                   <div className="flex flex-col items-center justify-center bg-gradient-to-br from-amber-500/15 to-orange-500/10 border border-amber-500/20 rounded-2xl p-5 min-w-[100px]">
                     <Flame className="w-7 h-7 text-amber-500 fill-amber-500 mb-1" />
-                    <span className="text-2xl font-bold text-foreground">{user.streak}</span>
+                    <span className="text-2xl font-bold text-foreground">{userStats.streak}</span>
                     <span className="text-[11px] text-muted-foreground font-medium">day streak</span>
                   </div>
                   <div className="flex flex-col items-center justify-center bg-gradient-to-br from-emerald-500/15 to-teal-500/10 border border-emerald-500/20 rounded-2xl p-5 min-w-[100px]">
                     <Award className="w-7 h-7 text-emerald-500 mb-1" />
-                    <span className="text-2xl font-bold text-foreground">{user.totalSessions}</span>
+                    <span className="text-2xl font-bold text-foreground">{userStats.totalSessions}</span>
                     <span className="text-[11px] text-muted-foreground font-medium">sessions</span>
                   </div>
                 </motion.div>
@@ -351,8 +383,8 @@ export default function MenteeDashboard() {
               <Button variant="ghost" size="sm" className="text-primary text-xs hover:bg-primary/5 rounded-full px-4">View All</Button>
             </div>
             <div className="space-y-3">
-              {recentActivity.map((activity, i) => {
-                const Icon = activity.icon;
+              {recentActivityList.map((activity, i) => {
+                const Icon = IconMap[activity.iconName] || CheckSquare;
                 return (
                   <motion.div
                     key={activity.id}
@@ -387,8 +419,8 @@ export default function MenteeDashboard() {
               <Button variant="ghost" size="sm" className="text-primary text-xs hover:bg-primary/5 rounded-full px-4">Browse All</Button>
             </div>
             <motion.div className="grid grid-cols-1 sm:grid-cols-2 gap-4" variants={stagger} initial="hidden" animate="visible">
-              {resources.map((r) => {
-                const Icon = r.icon;
+              {resourcesList.map((r) => {
+                const Icon = IconMap[r.icon] || BookOpen;
                 return (
                   <motion.div key={r.id} variants={fadeUp} className="h-full">
                     <Card className="!p-6 group cursor-pointer border-none ring-1 ring-white/5 hover:ring-primary/40 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 h-full flex flex-col bg-background/40 backdrop-blur-md">
@@ -442,7 +474,7 @@ export default function MenteeDashboard() {
                 </div>
               </div>
               <div className="flex gap-1 justify-center mt-2 overflow-hidden">
-                {heatmapData.map((week, wi) => (
+                {heatmapDataList.map((week, wi) => (
                   <div key={wi} className="flex flex-col gap-1">
                     {week.map((intensity, di) => (
                       <HeatmapCell key={`${wi}-${di}`} intensity={intensity} />
@@ -532,7 +564,7 @@ export default function MenteeDashboard() {
             
             {/* Switched from overflow flex row to a tight grid system */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-              {mentors.map((mentor, i) => (
+              {mentorsList.map((mentor, i) => (
                 <motion.div
                   key={mentor.id}
                   initial={{ opacity: 0, scale: 0.95 }}

@@ -52,7 +52,11 @@ export default function SignIn() {
             }
             navigate('/dashboard');
         } catch (err) {
-            setError(err.message);
+            if (err.code === 'auth/invalid-credential' || err.message.includes('auth/invalid-credential')) {
+                setError('Invalid credentials. If you originally signed up with Google, please click the "Google" button below.');
+            } else {
+                setError(err.message);
+            }
         }
     };
 

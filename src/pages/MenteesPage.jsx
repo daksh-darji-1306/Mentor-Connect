@@ -1,59 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Search, Filter, Users, Calendar, ArrowUpRight, MessageSquare, Briefcase } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Filter, Users, Calendar, ArrowUpRight, MessageSquare, Briefcase, X, Mail, BookOpen, Clock, MapPin, Building } from 'lucide-react';
 import { Card } from '../components/dashboard/DashboardWidgets';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 
 const MenteesPage = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [mentees, setMentees] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedMentee, setSelectedMentee] = useState(null);
 
     useEffect(() => {
         const fetchMenteesArr = async () => {
             if (!user?.id) return;
             try {
                 // 1. Fetch sessions this mentor has where someone has booked
-                const { data: sessionData } = await supabase
-                    .from('sessions')
-                    .select('booked_by, profiles!booked_by(*)')
-                    .eq('mentor_id', user.id)
-                    .not('booked_by', 'is', null);
+                const sessionQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id));
+                const sessionSnap = await getDocs(sessionQ);
 
                 // 2. Fetch accepted requests
-                const { data: requestData } = await supabase
-                    .from('requests')
-                    .select('mentee_id, profiles!mentee_id(*)')
-                    .eq('mentor_id', user.id)
-                    .eq('status', 'accepted');
+                const requestQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
+                const requestSnap = await getDocs(requestQ);
 
-                // Combine and deduplicate
+                const menteeIds = new Set();
+                const sessionCounts = {};
+                
+                sessionSnap.forEach(d => {
+                    const data = d.data();
+                    if (data.mentee_id) {
+                        menteeIds.add(data.mentee_id);
+                        sessionCounts[data.mentee_id] = (sessionCounts[data.mentee_id] || 0) + 1;
+                    }
+                });
+
+                requestSnap.forEach(d => {
+                    const data = d.data();
+                    if (data.mentee_id) menteeIds.add(data.mentee_id);
+                });
+
+                // Fetch profiles
                 const menteeMap = new Map();
-
-                sessionData?.forEach(s => {
-                    if (s.profiles) {
-                        menteeMap.set(s.booked_by, {
-                            ...s.profiles,
-                            total_sessions: (menteeMap.get(s.booked_by)?.total_sessions || 0) + 1,
-                            last_interaction: 'Session'
+                for (const mId of menteeIds) {
+                    const pDoc = await getDoc(doc(db, 'profiles', mId));
+                    if (pDoc.exists()) {
+                        menteeMap.set(mId, {
+                            ...pDoc.data(),
+                            total_sessions: sessionCounts[mId] || 0,
+                            last_interaction: sessionCounts[mId] ? 'Session' : 'Request'
                         });
                     }
-                });
-
-                requestData?.forEach(r => {
-                    if (r.profiles) {
-                        const existing = menteeMap.get(r.mentee_id) || {};
-                        menteeMap.set(r.mentee_id, {
-                            ...r.profiles,
-                            ...existing,
-                            total_sessions: existing.total_sessions || 0,
-                            last_interaction: existing.last_interaction || 'Request'
-                        });
-                    }
-                });
+                }
 
                 setMentees(Array.from(menteeMap.values()));
             } catch (err) {
@@ -129,21 +131,7 @@ const MenteesPage = () => {
                                     </div>
                                 </div>
 
-                                <div className="space-y-5 flex-1">
-                                    <div>
-                                        <div className="flex items-center justify-between text-xs mb-1.5">
-                                            <span className="text-muted-foreground font-medium">Learning Progress</span>
-                                            <span className="text-primary font-bold">{progress}%</span>
-                                        </div>
-                                        <div className="h-2 w-full bg-secondary/50 rounded-full overflow-hidden">
-                                            <motion.div
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${progress}%` }}
-                                                className="h-full bg-primary rounded-full"
-                                            />
-                                        </div>
-                                    </div>
-
+                                <div className="space-y-5 flex-1 pt-4">
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="p-2.5 rounded-xl bg-secondary/30 border border-border/40">
                                             <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -163,10 +151,10 @@ const MenteesPage = () => {
                                 </div>
 
                                 <div className="flex items-center justify-between pt-5 border-t border-border/40 mt-6">
-                                    <Button size="sm" variant="ghost" className="h-9 text-xs text-primary hover:bg-primary/5 px-4 font-semibold">
+                                    <Button onClick={() => setSelectedMentee(mentee)} size="sm" variant="ghost" className="h-9 text-xs text-primary hover:bg-primary/5 px-4 font-semibold">
                                         View Profile
                                     </Button>
-                                    <Button size="sm" className="h-9 px-4 gap-2 shadow-sm font-semibold">
+                                    <Button onClick={() => navigate('/messages')} size="sm" className="h-9 px-4 gap-2 shadow-sm font-semibold">
                                         Message <ArrowUpRight className="w-3.5 h-3.5" />
                                     </Button>
                                 </div>
@@ -175,6 +163,109 @@ const MenteesPage = () => {
                     })}
                 </div>
             )}
+
+            <AnimatePresence>
+                {selectedMentee && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+                        onClick={() => setSelectedMentee(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-card w-full max-w-lg border border-border/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                        >
+                            <div className="relative h-24 bg-gradient-to-r from-primary/20 via-violet-500/20 to-secondary/20 rounded-t-2xl">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setSelectedMentee(null)}
+                                    className="absolute top-4 right-4 h-8 w-8 rounded-full bg-background/50 hover:bg-background/80 backdrop-blur-sm z-20"
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                                <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 z-10">
+                                    <div className="w-24 h-24 rounded-full bg-background flex items-center justify-center p-1 shadow-lg">
+                                        <div className="w-full h-full rounded-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center text-primary-foreground font-bold text-3xl">
+                                            {selectedMentee.full_name?.charAt(0) || 'M'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="px-6 pb-6 pt-16 relative flex-1 overflow-y-auto">
+                                <div className="flex flex-col items-center mb-6">
+                                    <h2 className="text-2xl font-bold text-foreground">{selectedMentee.full_name}</h2>
+                                    <p className="text-primary font-medium flex items-center gap-2 mt-1">
+                                        {selectedMentee.profile_data?.headline || 'Mentee'}
+                                    </p>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {selectedMentee.profile_data?.bio && (
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">About</h3>
+                                            <p className="text-sm text-foreground leading-relaxed bg-secondary/20 p-4 rounded-xl border border-border/50">
+                                                {selectedMentee.profile_data.bio}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Mail className="w-4 h-4" /></div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground font-medium">Email</p>
+                                                <p className="text-sm font-semibold truncate max-w-[120px]">{selectedMentee.email}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Building className="w-4 h-4" /></div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground font-medium">Company/School</p>
+                                                <p className="text-sm font-semibold truncate max-w-[120px]">{selectedMentee.profile_data?.company || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><MapPin className="w-4 h-4" /></div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground font-medium">Location</p>
+                                                <p className="text-sm font-semibold truncate max-w-[120px]">{selectedMentee.profile_data?.location || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Calendar className="w-4 h-4" /></div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground font-medium">Total Sessions</p>
+                                                <p className="text-sm font-semibold">{selectedMentee.total_sessions || 0}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><MessageSquare className="w-4 h-4" /></div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground font-medium">Last Interaction</p>
+                                                <p className="text-sm font-semibold">{selectedMentee.last_interaction}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                            <div className="p-4 border-t border-border/50 bg-secondary/10 flex justify-end gap-3">
+                                <Button variant="outline" onClick={() => setSelectedMentee(null)}>Close</Button>
+                                <Button onClick={() => navigate('/messages')} className="gap-2">
+                                    Message <ArrowUpRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
