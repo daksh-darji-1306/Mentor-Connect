@@ -4,6 +4,7 @@ import {
     createUserWithEmailAndPassword, 
     signInWithEmailAndPassword, 
     signInWithPopup, 
+    signInWithRedirect,
     GoogleAuthProvider,
     onAuthStateChanged,
     signOut,
@@ -99,6 +100,11 @@ export const AuthProvider = ({ children }) => {
             const result = await signInWithPopup(auth, provider);
             return result.user;
         } catch (error) {
+            if (error.code === 'auth/popup-blocked') {
+                console.warn('Popup blocked, falling back to redirect...');
+                await signInWithRedirect(auth, provider);
+                return null;
+            }
             console.error('Firebase OAuth Error:', error);
             throw error;
         }
