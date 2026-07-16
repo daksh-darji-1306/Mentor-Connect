@@ -29,7 +29,7 @@ const MessagesPage = () => {
             if (data.length > 0) {
                 const formattedChats = data.map(p => ({
                     id: p.id,
-                    name: p.full_name || p.email.split('@')[0],
+                    name: p.full_name || p.email?.split('@')?.[0] || 'User',
                     role: p.role,
                     lastMessage: 'Tap to view conversation',
                     time: '',

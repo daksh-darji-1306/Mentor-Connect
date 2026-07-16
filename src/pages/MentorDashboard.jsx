@@ -88,7 +88,7 @@ const MentorDashboard = () => {
                         const p = profileDoc.data();
                         rList.push({
                            id: r.id,
-                           name: p.full_name || p.email.split('@')[0],
+                           name: p.full_name || p.email?.split('@')?.[0] || 'Mentee',
                            role: p.profile_data?.currentRole || 'Mentee',
                            message: data.message || "Hi, I'd like to connect!",
                            profile: {

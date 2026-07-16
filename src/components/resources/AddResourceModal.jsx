@@ -33,7 +33,7 @@ export default function AddResourceModal({ isOpen, onClose, onResourceAdded }) {
             const newResource = {
                 ...formData,
                 mentor_id: user.id,
-                mentor_name: user.full_name || user.fullName || user.email.split('@')[0],
+                mentor_name: user.full_name || user.fullName || user.email?.split('@')?.[0] || 'Mentor',
                 created_at: serverTimestamp(),
             };
 

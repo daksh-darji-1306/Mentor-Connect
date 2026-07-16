@@ -38,7 +38,7 @@ const MentorsPage = () => {
                     
                     return {
                         id: doc.id,
-                        name: profile.full_name || profile.email.split('@')[0],
+                        name: profile.full_name || profile.email?.split('@')?.[0] || 'Mentor',
                         email: profile.email || '',
                         role: profileData.currentRole || 'Mentor',
                         company: profileData.currentCompany || 'Independent',
@@ -96,7 +96,7 @@ const MentorsPage = () => {
         try {
             await addDoc(collection(db, 'requests'), {
                 mentee_id: user.id,
-                mentee_name: user.full_name || user.email.split('@')[0],
+                mentee_name: user.full_name || user.email?.split('@')?.[0] || 'Mentee',
                 mentor_id: mentorId,
                 mentor_name: mentorName,
                 status: 'pending',
@@ -120,7 +120,7 @@ const MentorsPage = () => {
                 mentor_id: selectedMentor.id,
                 mentor_name: selectedMentor.name,
                 mentee_id: user.id,
-                mentee_name: user.full_name || user.email.split('@')[0],
+                mentee_name: user.full_name || user.email?.split('@')?.[0] || 'Mentee',
                 topic: bookingTopic,
                 status: 'pending',
                 created_at: new Date().toISOString()

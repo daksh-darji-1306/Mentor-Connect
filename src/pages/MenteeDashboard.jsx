@@ -140,10 +140,10 @@ export default function MenteeDashboard() {
            if (pDoc.exists()) {
                const p = pDoc.data();
                mList.push({
-                   id: p.id,
-                   name: p.full_name || p.email.split('@')[0],
+                   id: mid,
+                   name: p.full_name || p.email?.split('@')?.[0] || 'Mentor',
                    role: p.profile_data?.currentRole || 'Mentor',
-                   avatar: (p.full_name || p.email)[0].toUpperCase(),
+                   avatar: (p.full_name || p.email || 'M')[0].toUpperCase(),
                    online: true,
                    gradient: colors[colorIdx % colors.length]
                });
