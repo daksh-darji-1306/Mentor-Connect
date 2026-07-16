@@ -91,7 +91,7 @@ const AddSessionModal = ({
 
             if (editingSession) {
                 // Update an already existing session
-                await updateDoc(doc(db, 'sessions', editingSession.id), {
+                await updateDoc(doc(db, 'profiles', user.id, 'sessions', editingSession.id), {
                     topic: sessionTopic,
                     start_time: startDateTime.toISOString(),
                     duration_minutes: parseInt(sessionDuration)
@@ -99,7 +99,7 @@ const AddSessionModal = ({
                 alert('Session updated successfully in Database! Note: Google Calendar event (if any) must be updated manually for now.');
             } else if (selectedSessionId) {
                 // We are updating an existing pending session request
-                await updateDoc(doc(db, 'sessions', selectedSessionId), {
+                await updateDoc(doc(db, 'profiles', user.id, 'sessions', selectedSessionId), {
                     google_event_id: googleEventId,
                     start_time: startDateTime.toISOString(),
                     duration_minutes: parseInt(sessionDuration),
@@ -110,7 +110,7 @@ const AddSessionModal = ({
             } else {
                 // Insert brand new session to Firestore Database
                 try {
-                    await addDoc(collection(db, 'sessions'), {
+                    await addDoc(collection(db, 'profiles', user.id, 'sessions'), {
                         google_event_id: googleEventId,
                         mentor_id: user.id,
                         mentor_name: user.full_name || user.fullName || 'Mentor',

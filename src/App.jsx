@@ -23,6 +23,7 @@ import WaitlistModal from './components/WaitlistModal';
 import SettingsPage from './pages/SettingsPage';
 import ResourcesPage from './pages/ResourcesPage';
 import AICareerAssistant from './pages/AICareerAssistant';
+import Migrate from './pages/Migrate';
 
 // Landing Page Wrapper
 
@@ -71,6 +72,7 @@ const AnimatedRoutes = () => {
           <Route path="/ai" element={<AICareerAssistant />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/profile" element={<SettingsPage />} />
+          <Route path="/migrate" element={<Migrate />} />
         </Route>
       </Routes>
     </AnimatePresence>

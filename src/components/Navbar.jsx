@@ -67,7 +67,9 @@ const Navbar = ({ onOpenWaitlist }) => {
                         <Link to="/login">
                             <Button variant="ghost" className="text-lg font-medium">Log In</Button>
                         </Link>
-                        <Button onClick={onOpenWaitlist} className="text-lg font-medium shadow-md shadow-primary/20 hover:glow-primary transition-all px-6 py-5">Join Waitlist</Button>
+                        <Link to="/signup">
+                            <Button className="text-lg font-medium shadow-md shadow-primary/20 hover:glow-primary transition-all px-6 py-5">Register</Button>
+                        </Link>
                     </div>
                 </div>
 
@@ -117,7 +119,9 @@ const Navbar = ({ onOpenWaitlist }) => {
                             <Link to="/login" onClick={() => setIsOpen(false)}>
                                 <Button variant="outline" className="w-full justify-center text-lg">Log In</Button>
                             </Link>
-                            <Button onClick={() => { setIsOpen(false); onOpenWaitlist(); }} className="w-full justify-center shadow-lg shadow-primary/20 text-lg py-6">Join Waitlist</Button>
+                            <Link to="/signup" onClick={() => setIsOpen(false)}>
+                                <Button className="w-full justify-center shadow-lg shadow-primary/20 text-lg py-6">Register</Button>
+                            </Link>
                         </div>
                     </div>
                 </div>

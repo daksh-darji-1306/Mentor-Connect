@@ -64,7 +64,7 @@ const Pricing = () => {
                         </div>
                         <Button 
                             className="w-full sm:w-auto px-8 py-6 text-base font-semibold shadow-lg shadow-primary/20 gap-2 flex items-center justify-center"
-                            onClick={() => window.open('https://github.com', '_blank')}
+                            onClick={() => window.open('https://github.com/daksh-darji-1306/Mentor-Connect', '_blank')}
                         >
                             <Github className="w-5 h-5" /> View on GitHub
                         </Button>

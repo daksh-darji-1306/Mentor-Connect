@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, orderBy, limit, getDocs, where, getDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, where, getDoc, doc, collectionGroup } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import {
@@ -102,7 +102,7 @@ export default function MenteeDashboard() {
     const fetchDashboardData = async () => {
       try {
         // 1. Fetch all sessions for the user
-        const sessionsQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id));
+        const sessionsQ = query(collectionGroup(db, 'sessions'), where('mentee_id', '==', user.id));
         const sessionsSnap = await getDocs(sessionsQ);
         const allSessions = sessionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -126,7 +126,7 @@ export default function MenteeDashboard() {
         }));
 
         // 2. Fetch mentors (from accepted requests and all sessions)
-        const reqQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
+        const reqQ = query(collectionGroup(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
         const reqSnap = await getDocs(reqQ);
         const mentorIds = new Set();
         reqSnap.forEach(d => mentorIds.add(d.data().mentor_id));
@@ -157,7 +157,7 @@ export default function MenteeDashboard() {
         setMentorsList(mList);
 
         // Fetch pending requests
-        const pendingQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'pending'));
+        const pendingQ = query(collectionGroup(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'pending'));
         const pendingSnap = await getDocs(pendingQ);
         setPendingRequestsCount(pendingSnap.docs.length);
 
@@ -165,7 +165,7 @@ export default function MenteeDashboard() {
         if (mentorIds.size > 0) {
             const uniqueMentorIds = Array.from(mentorIds);
             const resQ = query(
-                collection(db, 'resources'),
+                collectionGroup(db, 'resources'),
                 where('mentor_id', 'in', uniqueMentorIds.slice(0, 30))
             );
             const resSnap = await getDocs(resQ);
@@ -181,7 +181,7 @@ export default function MenteeDashboard() {
             .slice(0, 5);
 
         // 5. Dynamic Activity Heatmap
-        const activityQ = query(collection(db, 'activity_logs'), where('user_id', '==', user.id));
+        const activityQ = query(collection(db, 'profiles', user.id, 'activity_logs'), where('user_id', '==', user.id));
         const activitySnap = await getDocs(activityQ);
         
         const activityCounts = {};

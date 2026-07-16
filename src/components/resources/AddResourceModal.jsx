@@ -37,7 +37,7 @@ export default function AddResourceModal({ isOpen, onClose, onResourceAdded }) {
                 created_at: serverTimestamp(),
             };
 
-            await addDoc(collection(db, 'resources'), newResource);
+            await addDoc(collection(db, 'profiles', user.id, 'resources'), newResource);
             if (onResourceAdded) onResourceAdded();
             
             // Reset form

@@ -16,7 +16,7 @@ export function LinkCard({ title, description, details, imageUrl, href, classNam
     const CardContent = (
         <div
             className={cn(
-                "group relative flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card text-card-foreground shadow-sm transition-all hover:shadow-lg hover:border-primary/20 block h-fit",
+                "group relative flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card text-card-foreground shadow-sm transition-all hover:shadow-lg hover:border-primary/20 block h-full",
                 className
             )}
         >

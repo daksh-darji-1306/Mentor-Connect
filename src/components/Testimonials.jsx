@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star } from 'lucide-react';
 import Marquee from "@/components/ui/marquee";
 import { cn } from "@/lib/utils";
+import { db } from '../lib/firebase';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 
-const reviews = [
+const fallbackReviews = [
     {
         name: "James Ito",
         role: "Software Engineer",
@@ -64,6 +66,53 @@ const ReviewCard = ({
 };
 
 const Testimonials = () => {
+    const [reviews, setReviews] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchTestimonials = async () => {
+            try {
+                const q = query(collection(db, 'testimonials'), orderBy('created_at', 'desc'), limit(15));
+                const snapshot = await getDocs(q);
+                
+                if (!snapshot.empty) {
+                    const fetchedReviews = snapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            name: data.name,
+                            role: data.role,
+                            body: data.body,
+                            img: data.img || `https://avatar.vercel.sh/${doc.id}`
+                        };
+                    });
+                    
+                    // The Marquee component repeats its children to create an infinite scroll effect.
+                    // If we only have 1 or 2 real reviews, the user will see the exact same review 
+                    // repeated 4-5 times in a row, which looks like a bug.
+                    // To prevent this, if we have fewer than 5 real reviews, we will pad the array 
+                    // with some of the fallback reviews to keep the marquee diverse.
+                    let finalReviews = [...fetchedReviews];
+                    if (finalReviews.length < 5) {
+                        const needed = 5 - finalReviews.length;
+                        finalReviews = [...finalReviews, ...fallbackReviews.slice(0, needed)];
+                    }
+                    
+                    setReviews(finalReviews);
+                } else {
+                    setReviews(fallbackReviews);
+                }
+            } catch (error) {
+                console.error("Error fetching testimonials:", error);
+                setReviews(fallbackReviews);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchTestimonials();
+    }, []);
+
     return (
         <section id="testimonials" className="py-24 bg-background relative border-y border-border/40">
             <div className="container px-4 mx-auto mb-16 text-center">
@@ -76,11 +125,13 @@ const Testimonials = () => {
             </div>
 
             <div className="relative flex h-[400px] w-full flex-col items-center justify-center overflow-hidden bg-background md:shadow-xl">
-                <Marquee pauseOnHover className="[--duration:40s]">
-                    {reviews.map((review) => (
-                        <ReviewCard key={review.name} {...review} />
-                    ))}
-                </Marquee>
+                {!isLoading && (
+                    <Marquee pauseOnHover className="[--duration:40s]">
+                        {reviews.map((review, idx) => (
+                            <ReviewCard key={review.id || idx} {...review} />
+                        ))}
+                    </Marquee>
+                )}
                 <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-background"></div>
                 <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-background"></div>
             </div>

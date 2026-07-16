@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, collectionGroup } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import { BookOpen, Video, FileText, Link as LinkIcon, Plus, ExternalLink, Search } from 'lucide-react';
@@ -32,8 +32,7 @@ export default function ResourcesPage() {
             if (user.role === 'mentor') {
                 // Mentor sees their own resources
                 const q = query(
-                    collection(db, 'resources'),
-                    where('mentor_id', '==', user.id)
+                    collection(db, 'profiles', user.id, 'resources')
                 );
                 const snapshot = await getDocs(q);
                 const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -49,17 +48,17 @@ export default function ResourcesPage() {
                 const mentorIds = new Set();
 
                 // 1. Check requests collection
-                const reqQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
+                const reqQ = query(collectionGroup(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
                 const reqSnap = await getDocs(reqQ);
                 reqSnap.forEach(d => mentorIds.add(d.data().mentor_id));
 
                 // 2. Check sessions collection (mentees might be connected via accepted sessions)
-                const sessQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
+                const sessQ = query(collectionGroup(db, 'sessions'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
                 const sessSnap = await getDocs(sessQ);
                 sessSnap.forEach(d => mentorIds.add(d.data().mentor_id));
                 
                 // Fallback for older sessions that used 'booked_by' instead of 'mentee_id'
-                const legacySessQ = query(collection(db, 'sessions'), where('booked_by', '==', user.id), where('status', '==', 'accepted'));
+                const legacySessQ = query(collectionGroup(db, 'sessions'), where('booked_by', '==', user.id), where('status', '==', 'accepted'));
                 const legacySessSnap = await getDocs(legacySessQ);
                 legacySessSnap.forEach(d => mentorIds.add(d.data().mentor_id));
 
@@ -67,7 +66,7 @@ export default function ResourcesPage() {
 
                 if (uniqueMentorIds.length > 0) {
                     const q = query(
-                        collection(db, 'resources'),
+                        collectionGroup(db, 'resources'),
                         where('mentor_id', 'in', uniqueMentorIds.slice(0, 30)) // Firestore 'in' max 30
                     );
                     const snapshot = await getDocs(q);

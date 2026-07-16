@@ -4,7 +4,7 @@ import { Card } from '../components/dashboard/DashboardWidgets';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, getDocs, deleteDoc, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, getDocs, deleteDoc, doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 
 const MessagesPage = () => {
     const { user } = useAuth();
@@ -57,7 +57,7 @@ const MessagesPage = () => {
 
         // Fetch historical and real-time messages from the specific chat's subcollection
         const q = query(
-            collection(db, 'chats', chatId, 'messages')
+            collection(db, 'profiles', user.id, 'chats', chatId, 'messages')
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -128,8 +128,7 @@ const MessagesPage = () => {
         
         const chatId = [user.id, selectedChat].sort().join('_');
 
-        try {
-            await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        const msgData = {
                 sender_id: user.id,
                 sender_name: user.full_name || user.email?.split('@')[0] || 'User',
                 receiver_id: selectedChat,
@@ -137,7 +136,11 @@ const MessagesPage = () => {
                 content: contentToSend,
                 ...(imageToSend && { image_data: imageToSend }),
                 created_at: new Date().toISOString()
-            });
+            };
+        try {
+            const myMsgRef = await addDoc(collection(db, 'profiles', user.id, 'chats', chatId, 'messages'), msgData);
+            // Write exact same ID to other user so clearForEveryone works
+            await setDoc(doc(db, 'profiles', selectedChat, 'chats', chatId, 'messages', myMsgRef.id), msgData);
         } catch (error) {
             console.error("Error sending message:", error);
             setErrorMsg("Failed to send message: " + error.message);
@@ -156,7 +159,7 @@ const MessagesPage = () => {
         try {
             const chatId = [user.id, selectedChat].sort().join('_');
             for (const msg of messages) {
-                await updateDoc(doc(db, 'chats', chatId, 'messages', msg.id), {
+                await updateDoc(doc(db, 'profiles', user.id, 'chats', chatId, 'messages', msg.id), {
                     deleted_by: arrayUnion(user.id)
                 });
             }
@@ -172,7 +175,8 @@ const MessagesPage = () => {
         try {
             const chatId = [user.id, selectedChat].sort().join('_');
             for (const msg of messages) {
-                await deleteDoc(doc(db, 'chats', chatId, 'messages', msg.id));
+                await deleteDoc(doc(db, 'profiles', user.id, 'chats', chatId, 'messages', msg.id));
+                await deleteDoc(doc(db, 'profiles', selectedChat, 'chats', chatId, 'messages', msg.id));
             }
             setShowClearModal(false);
         } catch (error) {

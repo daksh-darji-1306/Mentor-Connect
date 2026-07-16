@@ -45,7 +45,7 @@ const MentorDashboard = () => {
 
     const handleRejectSession = async (sessionId) => {
         try {
-            await deleteDoc(doc(db, 'sessions', sessionId));
+            await deleteDoc(doc(db, 'profiles', user.id, 'sessions', sessionId));
             setSessionRequestsList(prev => prev.filter(s => s.id !== sessionId));
         } catch (err) { console.error("Error rejecting session:", err); }
     };
@@ -53,14 +53,14 @@ const MentorDashboard = () => {
     const handleCancelSession = async (sessionId) => {
         if (!window.confirm("Are you sure you want to cancel this session?")) return;
         try {
-            await deleteDoc(doc(db, 'sessions', sessionId));
+            await deleteDoc(doc(db, 'profiles', user.id, 'sessions', sessionId));
             setUpcomingSessions(prev => prev.filter(s => s.id !== sessionId));
         } catch (err) { console.error("Error cancelling session:", err); }
     };
 
     const handleAcceptRequest = async (reqId) => {
         try {
-            await updateDoc(doc(db, 'requests', reqId), { status: 'accepted' });
+            await updateDoc(doc(db, 'profiles', user.id, 'requests', reqId), { status: 'accepted' });
             setRequestsList(prev => prev.filter(r => r.id !== reqId));
             setMentorStats(prev => ({ ...prev, totalMentees: prev.totalMentees + 1 }));
         } catch (err) { console.error("Error accepting request:", err); }
@@ -68,7 +68,7 @@ const MentorDashboard = () => {
 
     const handleDeclineRequest = async (reqId) => {
         try {
-            await updateDoc(doc(db, 'requests', reqId), { status: 'declined' });
+            await updateDoc(doc(db, 'profiles', user.id, 'requests', reqId), { status: 'declined' });
             setRequestsList(prev => prev.filter(r => r.id !== reqId));
         } catch (err) { console.error("Error declining request:", err); }
     };
@@ -78,7 +78,7 @@ const MentorDashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 // Fetch pending requests
-                const reqQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
+                const reqQ = query(collection(db, 'profiles', user.id, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
                 const reqSnap = await getDocs(reqQ);
                 const rList = [];
                 for (const r of reqSnap.docs) {
@@ -103,7 +103,7 @@ const MentorDashboard = () => {
                 setRequestsList(rList);
 
                 // Fetch pending session requests
-                const sessReqQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
+                const sessReqQ = query(collection(db, 'profiles', user.id, 'sessions'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
                 const sessReqSnap = await getDocs(sessReqQ);
                 const sList = [];
                 for (const d of sessReqSnap.docs) {
@@ -124,10 +124,10 @@ const MentorDashboard = () => {
                 setSessionRequestsList(sList);
 
                 // Fetch stats (accepted requests + sessions)
-                const accQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
+                const accQ = query(collection(db, 'profiles', user.id, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
                 const accSnap = await getDocs(accQ);
                 
-                const sessionQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id));
+                const sessionQ = query(collection(db, 'profiles', user.id, 'sessions'), where('mentor_id', '==', user.id));
                 const sessionSnap = await getDocs(sessionQ);
                 
                 let hours = 0;
@@ -191,7 +191,7 @@ const MentorDashboard = () => {
         const fetchSessions = async () => {
             try {
                 const q = query(
-                    collection(db, 'sessions'),
+                    collection(db, 'profiles', user.id, 'sessions'),
                     where('mentor_id', '==', user.id)
                 );
                 const snapshot = await getDocs(q);

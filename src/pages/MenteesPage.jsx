@@ -21,11 +21,11 @@ const MenteesPage = () => {
             if (!user?.id) return;
             try {
                 // 1. Fetch sessions this mentor has where someone has booked
-                const sessionQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id));
+                const sessionQ = query(collection(db, 'profiles', user.id, 'sessions'), where('mentor_id', '==', user.id));
                 const sessionSnap = await getDocs(sessionQ);
 
                 // 2. Fetch accepted requests
-                const requestQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
+                const requestQ = query(collection(db, 'profiles', user.id, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
                 const requestSnap = await getDocs(requestQ);
 
                 const menteeIds = new Set();
