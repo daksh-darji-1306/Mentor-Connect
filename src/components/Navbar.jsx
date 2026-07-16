@@ -56,8 +56,8 @@ const Navbar = ({ onOpenWaitlist }) => {
                     <a href="/#testimonials" className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary">
                         Reviews
                     </a>
-                    <a href="/#pricing" className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary">
-                        Pricing
+                    <a href="/#opensource" className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary">
+                        Open Source
                     </a>
 
                     <div className="flex items-center gap-4 ml-4">
