@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useGoogleLogin } from '@react-oauth/google';
 
 const CalendarContext = createContext();
 
@@ -11,25 +10,53 @@ export const CalendarProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Initial check if we have a token stored
+    // Load token from localStorage on mount
     useEffect(() => {
         const storedToken = localStorage.getItem('google_calendar_token');
         if (storedToken) {
             setToken(storedToken);
         }
+
+        // Listen for token updates from OAuth callback page
+        const handleTokenUpdate = () => {
+            const newToken = localStorage.getItem('google_calendar_token');
+            if (newToken) setToken(newToken);
+        };
+        window.addEventListener('calendar_token_updated', handleTokenUpdate);
+        return () => window.removeEventListener('calendar_token_updated', handleTokenUpdate);
     }, []);
 
-    const login = useGoogleLogin({
-        onSuccess: (codeResponse) => {
-            setToken(codeResponse.access_token);
-            localStorage.setItem('google_calendar_token', codeResponse.access_token);
-        },
-        onError: (error) => {
-            console.error('Login Failed:', error);
-            setError('Login Failed');
-        },
-        scope: 'https://www.googleapis.com/auth/calendar.events',
-    });
+    /**
+     * Redirect-based Google OAuth login (avoids popup blocker issues).
+     * Redirects the user to Google's OAuth consent page.
+     * After consent, Google redirects to /oauth-callback where the token is extracted.
+     */
+    const login = () => {
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!clientId || clientId === 'placeholder') {
+            alert('Google Client ID is not configured. Please contact the administrator.');
+            return;
+        }
+
+        const redirectUri = `${window.location.origin}/oauth-callback`;
+        const scope = 'https://www.googleapis.com/auth/calendar.events';
+        const state = Math.random().toString(36).substring(2, 10);
+
+        // Save state for CSRF verification and where to redirect back after auth
+        sessionStorage.setItem('oauth_state', state);
+        sessionStorage.setItem('oauth_redirect_back', window.location.pathname);
+
+        const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+        authUrl.searchParams.set('client_id', clientId);
+        authUrl.searchParams.set('redirect_uri', redirectUri);
+        authUrl.searchParams.set('response_type', 'token');
+        authUrl.searchParams.set('scope', scope);
+        authUrl.searchParams.set('state', state);
+        authUrl.searchParams.set('include_granted_scopes', 'true');
+        authUrl.searchParams.set('prompt', 'consent');
+
+        window.location.href = authUrl.toString();
+    };
 
     const logout = () => {
         setToken(null);
@@ -43,32 +70,27 @@ export const CalendarProvider = ({ children }) => {
         setError(null);
         try {
             const timeMin = new Date();
-            timeMin.setDate(1); // Start of month
-            
+            timeMin.setDate(1);
             const timeMax = new Date();
-            timeMax.setMonth(timeMax.getMonth() + 2); // Until end of next month
-            
+            timeMax.setMonth(timeMax.getMonth() + 2);
+
             const response = await fetch(
                 `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
-            
+
             if (!response.ok) {
                 if (response.status === 401) {
-                    logout(); // Token expired
-                    throw new Error("Authentication expired. Please log in again.");
+                    logout();
+                    throw new Error('Authentication expired. Please reconnect Google Calendar.');
                 }
-                throw new Error("Failed to fetch events");
+                throw new Error('Failed to fetch events');
             }
 
             const data = await response.json();
             setEvents(data.items || []);
         } catch (err) {
-            console.error("Error fetching events:", err);
+            console.error('Error fetching events:', err);
             setError(err.message);
         } finally {
             setIsLoading(false);
@@ -77,7 +99,6 @@ export const CalendarProvider = ({ children }) => {
 
     const addEvent = async (event) => {
         if (!token) return false;
-        
         try {
             const response = await fetch(
                 'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
@@ -94,40 +115,28 @@ export const CalendarProvider = ({ children }) => {
             if (!response.ok) {
                 if (response.status === 401) {
                     logout();
-                    throw new Error("Authentication expired. Please log in again.");
+                    throw new Error('Authentication expired. Please reconnect Google Calendar.');
                 }
-                throw new Error("Failed to add event");
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData?.error?.message || 'Failed to add event');
             }
 
             const newEvent = await response.json();
             setEvents(prev => [...prev, newEvent]);
             return newEvent;
         } catch (err) {
-            console.error("Error adding event:", err);
+            console.error('Error adding event:', err);
             setError(err.message);
             return null;
         }
     };
 
     useEffect(() => {
-        if (token) {
-            fetchEvents();
-        }
+        if (token) fetchEvents();
     }, [token]);
 
     return (
-        <CalendarContext.Provider
-            value={{
-                token,
-                events,
-                isLoading,
-                error,
-                login,
-                logout,
-                fetchEvents,
-                addEvent
-            }}
-        >
+        <CalendarContext.Provider value={{ token, events, isLoading, error, login, logout, fetchEvents, addEvent }}>
             {children}
         </CalendarContext.Provider>
     );

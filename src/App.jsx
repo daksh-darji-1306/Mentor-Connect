@@ -10,7 +10,7 @@ import Testimonials from './components/Testimonials';
 import Footer from './components/Footer';
 import Pricing from './components/Pricing';
 import { AuthProvider } from './context/AuthContext';
-import { GoogleOAuthProvider } from '@react-oauth/google';
+import OAuthCallback from './pages/OAuthCallback';
 import { CalendarProvider } from './context/CalendarContext';
 import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
@@ -60,6 +60,7 @@ const AnimatedRoutes = () => {
         <Route path="/login" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/oauth-callback" element={<OAuthCallback />} />
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardHome />} />
           <Route path="/mentors" element={<MentorsPage />} />
@@ -88,17 +89,15 @@ function App() {
   }, []);
 
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'placeholder'}>
-      <CalendarProvider>
-        <Router>
-          <AuthProvider>
-            <div className="App">
-              <AnimatedRoutes />
-            </div>
-          </AuthProvider>
-        </Router>
-      </CalendarProvider>
-    </GoogleOAuthProvider>
+    <CalendarProvider>
+      <Router>
+        <AuthProvider>
+          <div className="App">
+            <AnimatedRoutes />
+          </div>
+        </AuthProvider>
+      </Router>
+    </CalendarProvider>
   );
 }
 
