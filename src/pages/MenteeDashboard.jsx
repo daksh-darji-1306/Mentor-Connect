@@ -101,13 +101,13 @@ export default function MenteeDashboard() {
     if (!user?.id) return;
     const fetchDashboardData = async () => {
       try {
-        // 1. Fetch upcoming sessions
-        const upcomingQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id));
-        const upcomingSnap = await getDocs(upcomingQ);
-        let upcoming = upcomingSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        // Sort and limit in memory to avoid composite index error
-        upcoming = upcoming
+        // 1. Fetch all sessions for the user
+        const sessionsQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id));
+        const sessionsSnap = await getDocs(sessionsQ);
+        const allSessions = sessionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Filter upcoming sessions
+        let upcoming = allSessions
             .filter(s => new Date(s.start_time) >= new Date())
             .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
             .slice(0, 3);
@@ -125,12 +125,16 @@ export default function MenteeDashboard() {
           };
         }));
 
-        // 2. Fetch mentors (from accepted requests)
+        // 2. Fetch mentors (from accepted requests and all sessions)
         const reqQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
         const reqSnap = await getDocs(reqQ);
         const mentorIds = new Set();
         reqSnap.forEach(d => mentorIds.add(d.data().mentor_id));
-        upcoming.forEach(s => mentorIds.add(s.mentor_id));
+        allSessions.forEach(s => {
+            if (s.mentor_id) {
+                mentorIds.add(s.mentor_id);
+            }
+        });
         
         const mList = [];
         const colors = ['from-violet-500 to-fuchsia-500', 'from-sky-500 to-cyan-400', 'from-emerald-500 to-teal-400', 'from-amber-500 to-orange-400'];
@@ -171,12 +175,7 @@ export default function MenteeDashboard() {
         }
 
         // 4. Heatmap & Recent Activity (Using sessions as a proxy)
-        const pastQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id));
-        const pastSnap = await getDocs(pastQ);
-        let pastSessions = pastSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        
-        // Sort and limit in memory to avoid composite index error
-        pastSessions = pastSessions
+        let pastSessions = allSessions
             .filter(s => new Date(s.start_time) < new Date())
             .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
             .slice(0, 5);
