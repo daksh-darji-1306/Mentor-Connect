@@ -44,6 +44,7 @@ const TopNavigation = () => {
             ? { label: 'Mentees', path: '/mentees' }
             : { label: 'Mentors', path: '/mentors' },
         { label: 'Messages', path: '/messages' },
+        ...(user?.role === 'mentee' ? [{ label: 'AI Matchmaker', path: '/ai' }] : []),
     ];
 
     return (

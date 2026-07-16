@@ -10,6 +10,7 @@ import {
     deleteUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { logActivity } from '../utils/activityLogger';
 
 const AuthContext = createContext();
 
@@ -52,8 +53,12 @@ export const AuthProvider = ({ children }) => {
                 return;
             }
 
-            // Profile exists, we are good to go
             setUser({ ...authUser, ...profileSnap.data(), id: authUser.uid });
+            
+            if (!sessionStorage.getItem('session_logged_in') && authUser.uid) {
+                sessionStorage.setItem('session_logged_in', 'true');
+                logActivity(authUser.uid, 'user_login');
+            }
         } catch (error) {
             console.error('Error fetching profile:', error);
             setUser({ ...authUser, id: authUser.uid });

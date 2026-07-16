@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Briefcase, Star, X, Calendar as CalendarIcon, Clock, BookOpen, Check } from 'lucide-react';
+import { logActivity } from '../utils/activityLogger';
 import { Card } from '../components/dashboard/DashboardWidgets';
 import { Button } from "@/components/ui/button";
 import { db } from '../lib/firebase';
@@ -80,6 +81,8 @@ const MentorsPage = () => {
                 status: 'pending',
                 created_at: new Date().toISOString()
             });
+
+            await logActivity(user.id, 'session_booked');
 
             setBookingSuccess(true);
             setTimeout(() => {

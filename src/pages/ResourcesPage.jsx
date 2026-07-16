@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { BookOpen, Video, FileText, Link as LinkIcon, Plus, ExternalLink, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '../components/dashboard/DashboardWidgets';
+import { logActivity } from '../utils/activityLogger';
 import AddResourceModal from '../components/resources/AddResourceModal';
 
 const stagger = {
@@ -190,6 +191,7 @@ export default function ResourcesPage() {
                                         href={resource.url} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
+                                        onClick={() => logActivity(user?.id, 'resource_viewed')}
                                         className="text-xs font-semibold text-primary flex items-center hover:underline"
                                     >
                                         View <ExternalLink className="w-3 h-3 ml-1" />

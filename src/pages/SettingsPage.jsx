@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { setPreference, getPreference } from '../utils/cookieManager';
+import { logActivity } from '../utils/activityLogger';
 import { useNavigate } from 'react-router-dom';
 
 const tabs = [
@@ -162,6 +163,7 @@ export default function SettingsPage() {
                         location,
                     },
                 });
+                await logActivity(user.id, 'profile_updated');
             }
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);

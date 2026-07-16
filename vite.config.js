@@ -9,6 +9,15 @@ const __dirname = path.dirname(__filename)
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/nim-api': {
+        target: 'https://integrate.api.nvidia.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/nim-api/, '')
+      }
+    }
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

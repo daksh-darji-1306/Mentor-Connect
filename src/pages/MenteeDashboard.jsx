@@ -102,9 +102,15 @@ export default function MenteeDashboard() {
     const fetchDashboardData = async () => {
       try {
         // 1. Fetch upcoming sessions
-        const upcomingQ = query(collection(db, 'sessions'), where('booked_by', '==', user.id), orderBy('start_time', 'asc'), limit(3));
+        const upcomingQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id));
         const upcomingSnap = await getDocs(upcomingQ);
-        const upcoming = upcomingSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        let upcoming = upcomingSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Sort and limit in memory to avoid composite index error
+        upcoming = upcoming
+            .filter(s => new Date(s.start_time) >= new Date())
+            .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+            .slice(0, 3);
         
         setUpcomingSessions(upcoming.map(ev => {
           const startDate = new Date(ev.start_time);
@@ -151,21 +157,58 @@ export default function MenteeDashboard() {
         const pendingSnap = await getDocs(pendingQ);
         setPendingRequestsCount(pendingSnap.docs.length);
 
-        // 3. Fetch Resources
-        const resQ = query(collection(db, 'resources'), limit(4));
-        const resSnap = await getDocs(resQ);
-        setResourcesList(resSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        // 3. Fetch Resources (only from connected mentors)
+        if (mentorIds.size > 0) {
+            const uniqueMentorIds = Array.from(mentorIds);
+            const resQ = query(
+                collection(db, 'resources'),
+                where('mentor_id', 'in', uniqueMentorIds.slice(0, 30))
+            );
+            const resSnap = await getDocs(resQ);
+            setResourcesList(resSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } else {
+            setResourcesList([]);
+        }
 
         // 4. Heatmap & Recent Activity (Using sessions as a proxy)
-        const pastQ = query(collection(db, 'sessions'), where('booked_by', '==', user.id), orderBy('start_time', 'desc'), limit(5));
+        const pastQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id));
         const pastSnap = await getDocs(pastQ);
-        const pastSessions = pastSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        let pastSessions = pastSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Sort and limit in memory to avoid composite index error
+        pastSessions = pastSessions
+            .filter(s => new Date(s.start_time) < new Date())
+            .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+            .slice(0, 5);
+
+        // 5. Dynamic Activity Heatmap
+        const activityQ = query(collection(db, 'activity_logs'), where('user_id', '==', user.id));
+        const activitySnap = await getDocs(activityQ);
+        
+        const activityCounts = {};
+        activitySnap.forEach(doc => {
+            const data = doc.data();
+            if (data.timestamp) {
+                const date = data.timestamp.toDate();
+                const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                activityCounts[dateString] = (activityCounts[dateString] || 0) + 1;
+            }
+        });
 
         const weeks = [];
+        const today = new Date();
+        let currentDate = new Date(today);
+        currentDate.setDate(currentDate.getDate() - (12 * 7 - 1)); // 83 days ago
+        
         for (let w = 0; w < 12; w++) {
           const days = [];
           for (let d = 0; d < 7; d++) {
-            days.push(Math.random() > 0.7 ? Math.floor(Math.random() * 4) + 1 : 0); // Simulated real activity for unrecorded past days
+            const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+            const count = activityCounts[dateString] || 0;
+            const intensity = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : count === 3 ? 3 : 4;
+            
+            days.push(intensity);
+            currentDate.setDate(currentDate.getDate() + 1);
           }
           weeks.push(days);
         }
