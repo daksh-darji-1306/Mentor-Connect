@@ -1,10 +1,12 @@
 {
-    "framework": "vite",
-    "rewrites": [
-        {
-            "source": "/(.*)",
-            "destination": "/index.html"
-        }
-    ],
-    "cleanUrls": true
+  "rewrites": [
+    {
+      "source": "/nim-api/:path*",
+      "destination": "https://integrate.api.nvidia.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
