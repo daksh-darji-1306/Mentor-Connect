@@ -18,7 +18,8 @@ const SignUp = () => {
         try {
             localStorage.setItem('signup_intent', 'true');
             localStorage.setItem('signup_role', role);
-            await loginWithGoogle();
+            const loggedInUser = await loginWithGoogle();
+            if (!loggedInUser) return;
             navigate('/onboarding');
         } catch (error) {
             console.error('Signup error:', error);

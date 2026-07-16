@@ -64,7 +64,8 @@ export default function SignIn() {
         try {
             setError('');
             localStorage.setItem('signup_intent', 'false');
-            await loginWithGoogle();
+            const loggedInUser = await loginWithGoogle();
+            if (!loggedInUser) return;
             if (cookieConsent) {
                 setPreference('last_login_method', 'google');
             }
