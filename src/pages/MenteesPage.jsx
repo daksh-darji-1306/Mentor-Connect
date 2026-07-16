@@ -51,6 +51,7 @@ const MenteesPage = () => {
                     if (pDoc.exists()) {
                         menteeMap.set(mId, {
                             ...pDoc.data(),
+                            id: mId,
                             total_sessions: sessionCounts[mId] || 0,
                             last_interaction: sessionCounts[mId] ? 'Session' : 'Request'
                         });

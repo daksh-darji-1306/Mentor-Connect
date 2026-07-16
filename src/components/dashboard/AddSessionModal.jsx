@@ -14,6 +14,7 @@ const AddSessionModal = ({
     selectedSessionId, 
     selectedMentee,
     initialTopic = '',
+    initialDate = '',
     onSessionAdded,
     editingSession = null
 }) => {
@@ -41,7 +42,7 @@ const AddSessionModal = ({
                 setSessionDuration(editingSession.duration_minutes?.toString() || '60');
             } else {
                 setSessionTopic(initialTopic);
-                setSessionDate('');
+                setSessionDate(initialDate);
                 setSessionTime('');
                 setSessionDuration('60');
             }

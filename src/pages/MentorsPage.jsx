@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Briefcase, Star, X, Calendar as CalendarIcon, Clock, BookOpen, Check } from 'lucide-react';
+import { Search, Filter, Briefcase, Star, X, Calendar as CalendarIcon, Clock, BookOpen, Check, Mail, Linkedin, Github, MapPin, Building, Award, MessageSquare } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLogger';
 import { Card } from '../components/dashboard/DashboardWidgets';
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ const MentorsPage = () => {
 
     // Booking Modal State
     const [selectedMentor, setSelectedMentor] = useState(null);
+    const [viewingMentorProfile, setViewingMentorProfile] = useState(null);
+    const [connectionStatuses, setConnectionStatuses] = useState({});
     const [bookingDate, setBookingDate] = useState('');
     const [bookingTime, setBookingTime] = useState('');
     const [bookingTopic, setBookingTopic] = useState('');
@@ -34,13 +37,19 @@ const MentorsPage = () => {
                     const colorIndex = profile.full_name ? profile.full_name.charCodeAt(0) % colors.length : 0;
                     
                     return {
-                        id: profile.id,
+                        id: doc.id,
                         name: profile.full_name || profile.email.split('@')[0],
+                        email: profile.email || '',
                         role: profileData.currentRole || 'Mentor',
                         company: profileData.currentCompany || 'Independent',
                         rating: 5.0,
                         reviews: Math.floor(Math.random() * 50) + 10, // Mock reviews for UI
-                        specialties: profileData.expertise && profileData.expertise.length > 0 ? profileData.expertise : ['Mentorship', 'Career Advice'],
+                        specialties: profileData.specializations && profileData.specializations.length > 0 ? profileData.specializations : ['Mentorship', 'Career Advice'],
+                        bio: profileData.bio || '',
+                        location: profileData.location || 'N/A',
+                        linkedin: profileData.linkedin || '',
+                        github: profileData.github || '',
+                        mentoringStyle: profileData.mentoringStyle || '',
                         availability: "Available",
                         color: colors[colorIndex]
                     };
@@ -54,8 +63,25 @@ const MentorsPage = () => {
             }
         };
 
+        const fetchRequests = async () => {
+            if (!user?.id) return;
+            try {
+                const reqQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id));
+                const reqSnap = await getDocs(reqQ);
+                const reqs = {};
+                reqSnap.forEach(d => {
+                    const data = d.data();
+                    reqs[data.mentor_id] = data.status;
+                });
+                setConnectionStatuses(reqs);
+            } catch (err) {
+                console.error("Error fetching requests:", err);
+            }
+        };
+ 
         if (user) {
             fetchMentors();
+            fetchRequests();
         }
     }, [user]);
 
@@ -65,11 +91,29 @@ const MentorsPage = () => {
         mentor.company.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const handleConnect = async (mentorId, mentorName) => {
+        if (!user) return;
+        try {
+            await addDoc(collection(db, 'requests'), {
+                mentee_id: user.id,
+                mentee_name: user.full_name || user.email.split('@')[0],
+                mentor_id: mentorId,
+                mentor_name: mentorName,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+                message: `Hi ${mentorName}, I would love to connect with you for mentorship!`
+            });
+            setConnectionStatuses(prev => ({ ...prev, [mentorId]: 'pending' }));
+        } catch (error) {
+            console.error("Error sending connection request:", error);
+        }
+    };
+
     const handleBookSession = async (e) => {
         e.preventDefault();
         if (!selectedMentor || !bookingTopic || !user) return;
         setIsBooking(true);
-
+ 
         try {
             
             await addDoc(collection(db, 'sessions'), {
@@ -81,16 +125,16 @@ const MentorsPage = () => {
                 status: 'pending',
                 created_at: new Date().toISOString()
             });
-
+ 
             await logActivity(user.id, 'session_booked');
-
+ 
             setBookingSuccess(true);
             setTimeout(() => {
                 setSelectedMentor(null);
                 setBookingSuccess(false);
                 setBookingTopic('');
             }, 2000);
-
+ 
         } catch (error) {
             console.error("Error booking session:", error);
         } finally {
@@ -183,18 +227,179 @@ const MentorsPage = () => {
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-border/50 flex items-center justify-between mt-auto">
-                                <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
-                                    {mentor.availability}
-                                </span>
-                                <Button size="sm" className="font-semibold" onClick={() => setSelectedMentor(mentor)}>
-                                    Book Session
+                            <div className="pt-4 border-t border-border/50 flex items-center justify-between mt-auto gap-2">
+                                <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="text-xs text-primary font-semibold hover:bg-primary/5"
+                                    onClick={() => setViewingMentorProfile(mentor)}
+                                >
+                                    View Profile
                                 </Button>
+                                {connectionStatuses[mentor.id] === 'accepted' ? (
+                                    <Button size="sm" className="font-semibold text-xs" onClick={() => setSelectedMentor(mentor)}>
+                                        Book Session
+                                    </Button>
+                                ) : connectionStatuses[mentor.id] === 'pending' ? (
+                                    <Button size="sm" variant="outline" disabled className="text-xs font-semibold">
+                                        Pending
+                                    </Button>
+                                ) : (
+                                    <Button size="sm" className="font-semibold text-xs bg-primary text-primary-foreground shadow-sm shadow-primary/10" onClick={() => handleConnect(mentor.id, mentor.name)}>
+                                        Connect
+                                    </Button>
+                                )}
                             </div>
                         </Card>
                     ))}
                 </div>
             )}
+
+            {/* Mentor Profile Modal */}
+            <AnimatePresence>
+                {viewingMentorProfile && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+                        onClick={() => setViewingMentorProfile(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-card w-full max-w-lg border border-border/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                        >
+                            <div className="relative h-24 bg-gradient-to-r from-primary/20 via-violet-500/20 to-secondary/20 rounded-t-2xl">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setViewingMentorProfile(null)}
+                                    className="absolute top-4 right-4 h-8 w-8 rounded-full bg-background/50 hover:bg-background/80 backdrop-blur-sm z-20"
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                                <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 z-10">
+                                    <div className="w-24 h-24 rounded-full bg-background flex items-center justify-center p-1 shadow-lg">
+                                        <div className={`w-full h-full rounded-full ${viewingMentorProfile.color} flex items-center justify-center text-white font-bold text-3xl uppercase`}>
+                                            {viewingMentorProfile.name.charAt(0)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="px-6 pb-6 pt-16 relative flex-1 overflow-y-auto">
+                                <div className="flex flex-col items-center mb-6">
+                                    <h2 className="text-2xl font-bold text-foreground">{viewingMentorProfile.name}</h2>
+                                    <p className="text-primary font-medium flex items-center gap-2 mt-1">
+                                        {viewingMentorProfile.role} at {viewingMentorProfile.company}
+                                    </p>
+                                    <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
+                                        <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                                        <span className="font-bold text-foreground">{viewingMentorProfile.rating}</span>
+                                        <span>({viewingMentorProfile.reviews} reviews)</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {viewingMentorProfile.bio && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">About</h3>
+                                            <p className="text-sm text-foreground leading-relaxed bg-secondary/20 p-4 rounded-xl border border-border/50">
+                                                {viewingMentorProfile.bio}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Specialties</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {viewingMentorProfile.specialties.map((spec, i) => (
+                                                <span key={i} className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-semibold">
+                                                    {spec}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {viewingMentorProfile.mentoringStyle && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Mentoring Style</h3>
+                                            <p className="text-sm text-foreground italic leading-relaxed bg-secondary/10 p-3 rounded-xl border border-border/30">
+                                                "{viewingMentorProfile.mentoringStyle}"
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Mail className="w-4 h-4" /></div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs text-muted-foreground font-medium">Email</p>
+                                                <p className="text-sm font-semibold truncate">{viewingMentorProfile.email || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><MapPin className="w-4 h-4" /></div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs text-muted-foreground font-medium">Location</p>
+                                                <p className="text-sm font-semibold truncate">{viewingMentorProfile.location}</p>
+                                            </div>
+                                        </div>
+                                        {viewingMentorProfile.linkedin && (
+                                            <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                                <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Linkedin className="w-4 h-4" /></div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs text-muted-foreground font-medium">LinkedIn</p>
+                                                    <a href={viewingMentorProfile.linkedin} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary hover:underline truncate block">Profile</a>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {viewingMentorProfile.github && (
+                                            <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                                <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Github className="w-4 h-4" /></div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs text-muted-foreground font-medium">GitHub</p>
+                                                    <a href={viewingMentorProfile.github} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary hover:underline truncate block">GitHub</a>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 border-t border-border/50 bg-secondary/10 flex justify-end gap-3">
+                                <Button variant="outline" onClick={() => setViewingMentorProfile(null)}>Close</Button>
+                                {connectionStatuses[viewingMentorProfile.id] === 'accepted' ? (
+                                    <Button 
+                                        className="gap-2"
+                                        onClick={() => {
+                                            setSelectedMentor(viewingMentorProfile);
+                                            setViewingMentorProfile(null);
+                                        }}
+                                    >
+                                        Book Session
+                                    </Button>
+                                ) : connectionStatuses[viewingMentorProfile.id] === 'pending' ? (
+                                    <Button disabled variant="outline">
+                                        Request Pending
+                                    </Button>
+                                ) : (
+                                    <Button 
+                                        onClick={() => {
+                                            handleConnect(viewingMentorProfile.id, viewingMentorProfile.name);
+                                            setViewingMentorProfile(null);
+                                        }}
+                                    >
+                                        Connect
+                                    </Button>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Booking Modal Overlay */}
             {selectedMentor && (

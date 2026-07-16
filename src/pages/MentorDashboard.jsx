@@ -22,6 +22,7 @@ const MentorDashboard = () => {
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedMentee, setSelectedMentee] = useState(null);
     const [editingSession, setEditingSession] = useState(null);
+    const [viewingMenteeProfile, setViewingMenteeProfile] = useState(null);
 
     const [upcomingSessions, setUpcomingSessions] = useState([]);
     const [requestsList, setRequestsList] = useState([]);
@@ -89,7 +90,13 @@ const MentorDashboard = () => {
                            id: r.id,
                            name: p.full_name || p.email.split('@')[0],
                            role: p.profile_data?.currentRole || 'Mentee',
-                           message: data.message || "Hi, I'd like to connect!"
+                           message: data.message || "Hi, I'd like to connect!",
+                           profile: {
+                               ...p,
+                               email: p.email || '',
+                               full_name: p.full_name || p.email?.split('@')[0] || 'Mentee',
+                               id: data.mentee_id
+                           }
                         });
                     }
                 }
@@ -98,7 +105,23 @@ const MentorDashboard = () => {
                 // Fetch pending session requests
                 const sessReqQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
                 const sessReqSnap = await getDocs(sessReqQ);
-                setSessionRequestsList(sessReqSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                const sList = [];
+                for (const d of sessReqSnap.docs) {
+                    const sData = d.data();
+                    const profileDoc = await getDoc(doc(db, 'profiles', sData.mentee_id));
+                    const p = profileDoc.exists() ? profileDoc.data() : {};
+                    sList.push({
+                        id: d.id,
+                        ...sData,
+                        profile: {
+                            ...p,
+                            email: p.email || '',
+                            full_name: p.full_name || sData.mentee_name || 'Mentee',
+                            id: sData.mentee_id
+                        }
+                    });
+                }
+                setSessionRequestsList(sList);
 
                 // Fetch stats (accepted requests + sessions)
                 const accQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
@@ -332,9 +355,19 @@ const MentorDashboard = () => {
                             {requestsList.map((req, i) => (
                                 <div key={i} className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-b last:border-0 border-border/50 pb-4 last:pb-0">
                                     <div className="flex gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-secondary flex-shrink-0" />
+                                        <button 
+                                            onClick={() => setViewingMenteeProfile(req.profile)}
+                                            className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 font-bold uppercase hover:bg-primary/20 transition-colors"
+                                        >
+                                            {req.name ? req.name[0].toUpperCase() : 'M'}
+                                        </button>
                                         <div>
-                                            <h4 className="font-bold text-sm text-foreground">{req.name} <span className="text-xs font-normal text-muted-foreground">• {req.role}</span></h4>
+                                            <h4 className="font-bold text-sm text-foreground">
+                                                <button onClick={() => setViewingMenteeProfile(req.profile)} className="hover:underline text-left">
+                                                    {req.name}
+                                                </button>
+                                                <span className="text-xs font-normal text-muted-foreground">• {req.role}</span>
+                                            </h4>
                                             <p className="text-sm text-muted-foreground line-clamp-1">{req.message}</p>
                                         </div>
                                     </div>
@@ -349,11 +382,19 @@ const MentorDashboard = () => {
                                 return (
                                 <div key={`sess-${i}`} className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-b last:border-0 border-border/50 pb-4 last:pb-0">
                                     <div className="flex gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center flex-shrink-0 font-bold">
+                                        <button 
+                                            onClick={() => setViewingMenteeProfile(req.profile)}
+                                            className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center flex-shrink-0 font-bold hover:bg-primary/30 transition-colors"
+                                        >
                                             {req.mentee_name ? req.mentee_name[0].toUpperCase() : 'M'}
-                                        </div>
+                                        </button>
                                         <div>
-                                            <h4 className="font-bold text-sm text-foreground">{req.mentee_name || 'Mentee'} <span className="text-xs font-normal text-muted-foreground">• Session Request</span></h4>
+                                            <h4 className="font-bold text-sm text-foreground">
+                                                <button onClick={() => setViewingMenteeProfile(req.profile)} className="hover:underline text-left">
+                                                    {req.mentee_name || 'Mentee'}
+                                                </button>
+                                                <span className="text-xs font-normal text-muted-foreground">• Session Request</span>
+                                            </h4>
                                             <p className="text-sm text-muted-foreground line-clamp-1">{req.topic} | Needs Scheduling</p>
                                         </div>
                                     </div>
@@ -398,6 +439,134 @@ const MentorDashboard = () => {
                         }
                     }}
                 />
+            </AnimatePresence>
+
+            {/* Mentee Profile Modal */}
+            <AnimatePresence>
+                {viewingMenteeProfile && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+                        onClick={() => setViewingMenteeProfile(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-card w-full max-w-lg border border-border/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                        >
+                            <div className="relative h-24 bg-gradient-to-r from-primary/20 via-violet-500/20 to-secondary/20 rounded-t-2xl">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setViewingMenteeProfile(null)}
+                                    className="absolute top-4 right-4 h-8 w-8 rounded-full bg-background/50 hover:bg-background/80 backdrop-blur-sm z-20"
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                                <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 z-10">
+                                    <div className="w-24 h-24 rounded-full bg-background flex items-center justify-center p-1 shadow-lg">
+                                        <div className="w-full h-full rounded-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center text-primary-foreground font-bold text-3xl">
+                                            {viewingMenteeProfile.full_name ? viewingMenteeProfile.full_name.charAt(0).toUpperCase() : 'M'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="px-6 pb-6 pt-16 relative flex-1 overflow-y-auto">
+                                <div className="flex flex-col items-center mb-6">
+                                    <h2 className="text-2xl font-bold text-foreground">{viewingMenteeProfile.full_name || 'Mentee'}</h2>
+                                    <p className="text-primary font-medium flex items-center gap-2 mt-1">
+                                        {viewingMenteeProfile.profile_data?.headline || 'Mentee'}
+                                    </p>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {viewingMenteeProfile.profile_data?.bio && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">About</h3>
+                                            <p className="text-sm text-foreground leading-relaxed bg-secondary/20 p-4 rounded-xl border border-border/50">
+                                                {viewingMenteeProfile.profile_data.bio}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Skills / Interests */}
+                                    {((viewingMenteeProfile.profile_data?.languages && viewingMenteeProfile.profile_data.languages.length > 0) || 
+                                      (viewingMenteeProfile.profile_data?.frameworks && viewingMenteeProfile.profile_data.frameworks.length > 0) || 
+                                      (viewingMenteeProfile.profile_data?.tools && viewingMenteeProfile.profile_data.tools.length > 0)) && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Skills & Technologies</h3>
+                                            <div className="flex flex-wrap gap-2">
+                                                {viewingMenteeProfile.profile_data.languages?.map((lang, i) => (
+                                                    <span key={`lang-${i}`} className="px-2.5 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-md text-xs font-medium">
+                                                        {lang}
+                                                    </span>
+                                                ))}
+                                                {viewingMenteeProfile.profile_data.frameworks?.map((fw, i) => (
+                                                    <span key={`fw-${i}`} className="px-2.5 py-1 bg-purple-500/10 text-purple-500 border border-purple-500/20 rounded-md text-xs font-medium">
+                                                        {fw}
+                                                    </span>
+                                                ))}
+                                                {viewingMenteeProfile.profile_data.tools?.map((t, i) => (
+                                                    <span key={`t-${i}`} className="px-2.5 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-md text-xs font-medium">
+                                                        {t}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {viewingMenteeProfile.profile_data?.primaryGoal && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Primary Goal</h3>
+                                            <p className="text-sm text-foreground leading-relaxed bg-secondary/10 p-3 rounded-xl border border-border/30">
+                                                {viewingMenteeProfile.profile_data.primaryGoal}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Users className="w-4 h-4" /></div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs text-muted-foreground font-medium">Email</p>
+                                                <p className="text-sm font-semibold truncate">{viewingMenteeProfile.email || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Building className="w-4 h-4" /></div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs text-muted-foreground font-medium">University</p>
+                                                <p className="text-sm font-semibold truncate">{viewingMenteeProfile.profile_data?.university || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Clock className="w-4 h-4" /></div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs text-muted-foreground font-medium">Year of Study</p>
+                                                <p className="text-sm font-semibold truncate">{viewingMenteeProfile.profile_data?.yearOfStudy || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 flex items-center gap-3">
+                                            <div className="p-2 bg-background rounded-lg text-primary shadow-sm"><Star className="w-4 h-4" /></div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs text-muted-foreground font-medium">Weekly Commitment</p>
+                                                <p className="text-sm font-semibold truncate">{viewingMenteeProfile.profile_data?.weeklyCommitment || 'N/A'} hours</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 border-t border-border/50 bg-secondary/10 flex justify-end">
+                                <Button variant="outline" onClick={() => setViewingMenteeProfile(null)}>Close</Button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
             </AnimatePresence>
         </motion.div>
     );

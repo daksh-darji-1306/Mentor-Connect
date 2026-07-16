@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Calendar as CalendarIcon, Clock, Video, ChevronLeft, ChevronRight, MoreHorizontal, Bell, Link2 } from 'lucide-react';
 import { Card } from '../components/dashboard/DashboardWidgets';
 import { Button } from "@/components/ui/button";
+import AddSessionModal from '../components/dashboard/AddSessionModal';
 import { db } from '../lib/firebase';
 import { collection, getDocs, query, or, where } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +12,9 @@ const SessionsPage = () => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [sessions, setSessions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
+    const [selectedDate, setSelectedDate] = useState('');
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     React.useEffect(() => {
         if (!user) return;
@@ -61,7 +65,7 @@ const SessionsPage = () => {
         };
 
         fetchSessions();
-    }, [currentMonth, user]);
+    }, [currentMonth, user, refreshTrigger]);
 
     // Calendar Header
     const monthName = currentMonth.toLocaleString('default', { month: 'long' });
@@ -134,10 +138,18 @@ const SessionsPage = () => {
                     <div className="grid grid-cols-7 grid-rows-5 gap-px bg-border/20 flex-1 rounded-lg overflow-hidden border border-border/20">
                         {days.map((d, index) => {
                             const events = d.day ? getEventsForDay(d.day) : [];
+                            const isMentor = user?.role === 'mentor';
                             return (
                                 <div
                                     key={index}
-                                    className={`bg-card relative p-2 min-h-[80px] flex flex-col gap-1 transition-colors hover:bg-secondary/10 ${!d.day ? 'bg-secondary/5' : ''}`}
+                                    className={`bg-card relative p-2 min-h-[80px] flex flex-col gap-1 transition-colors ${!d.day ? 'bg-secondary/5' : 'hover:bg-secondary/10'} ${isMentor && d.day ? 'cursor-pointer hover:border-primary/30 border border-transparent' : ''}`}
+                                    onClick={() => {
+                                        if (isMentor && d.day) {
+                                            const formattedDate = `${year}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+                                            setSelectedDate(formattedDate);
+                                            setIsAddSessionOpen(true);
+                                        }
+                                    }}
                                 >
                                     {d.day && (
                                         <span className={`text-sm font-medium ${d.day === new Date().getDate() && currentMonth.getMonth() === new Date().getMonth() ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
@@ -210,6 +222,12 @@ const SessionsPage = () => {
                     </div>
                 </div>
             </div>
+            <AddSessionModal 
+                isOpen={isAddSessionOpen} 
+                onClose={() => setIsAddSessionOpen(false)} 
+                initialDate={selectedDate} 
+                onSessionAdded={() => setRefreshTrigger(prev => prev + 1)} 
+            />
         </div>
     );
 };

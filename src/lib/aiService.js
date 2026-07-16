@@ -48,8 +48,8 @@ If the user asks about ANYTHING unrelated to career guidance, mentorship, or the
 Here is the current list of active mentors on the platform:
 ${mentorsContext}
 
-When recommending a mentor, ALWAYS mention their name, headline, and why they are a good match based on their skills.
-CRITICAL INSTRUCTION: When you recommend a specific mentor, you MUST append exactly this string at the end of your sentence: [MENTOR_ID: <their_id>] where <their_id> is the ID provided in the list above. Do NOT wrap it in backticks.`;
+When recommending mentors, ALWAYS try to provide your TOP 3 best matches (if enough mentors exist). For each mentor, mention their name, headline, and why they are a good match based on their skills.
+CRITICAL INSTRUCTION: Whenever you recommend a specific mentor, you MUST append exactly this string at the end of their description: [MENTOR_ID: <their_id>] where <their_id> is the ID provided in the list above. Do NOT wrap it in backticks.`;
 
     const fullMessages = [
         { role: 'system', content: systemPrompt },
