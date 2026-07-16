@@ -189,9 +189,24 @@ export default function MenteeDashboard() {
         activitySnap.forEach(doc => {
             const data = doc.data();
             if (data.timestamp) {
-                const date = data.timestamp.toDate();
-                const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                activityCounts[dateString] = (activityCounts[dateString] || 0) + 1;
+                let date;
+                try {
+                    if (typeof data.timestamp.toDate === 'function') {
+                        date = data.timestamp.toDate();
+                    } else if (data.timestamp instanceof Date) {
+                        date = data.timestamp;
+                    } else if (data.timestamp.seconds) {
+                        date = new Date(data.timestamp.seconds * 1000);
+                    } else {
+                        date = new Date(data.timestamp);
+                    }
+                    if (!isNaN(date.getTime())) {
+                        const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                        activityCounts[dateString] = (activityCounts[dateString] || 0) + 1;
+                    }
+                } catch (e) {
+                    console.error("Error parsing activity timestamp:", e);
+                }
             }
         });
 

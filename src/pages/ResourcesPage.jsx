@@ -38,7 +38,11 @@ export default function ResourcesPage() {
                 const snapshot = await getDocs(q);
                 const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 // Sort by created_at desc manually if index is missing
-                data.sort((a, b) => (b.created_at?.toMillis?.() || 0) - (a.created_at?.toMillis?.() || 0));
+                data.sort((a, b) => {
+                    const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+                    const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+                    return dateB - dateA;
+                });
                 setResources(data);
             } else {
                 // Mentee sees resources from their connected mentors
@@ -68,7 +72,11 @@ export default function ResourcesPage() {
                     );
                     const snapshot = await getDocs(q);
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    data.sort((a, b) => (b.created_at?.toMillis?.() || 0) - (a.created_at?.toMillis?.() || 0));
+                    data.sort((a, b) => {
+                        const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+                        const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+                        return dateB - dateA;
+                    });
                     setResources(data);
                 } else {
                     setResources([]);
