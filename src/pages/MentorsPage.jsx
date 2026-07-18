@@ -66,7 +66,7 @@ const MentorsPage = () => {
         const fetchRequests = async () => {
             if (!user?.id) return;
             try {
-                const reqQ = query(collectionGroup(db, 'requests'), where('mentee_id', '==', user.id));
+                const reqQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id));
                 const reqSnap = await getDocs(reqQ);
                 const reqs = {};
                 reqSnap.forEach(d => {
@@ -94,7 +94,7 @@ const MentorsPage = () => {
     const handleConnect = async (mentorId, mentorName) => {
         if (!user) return;
         try {
-            await addDoc(collection(db, 'profiles', mentorId, 'requests'), {
+            await addDoc(collection(db, 'requests'), {
                 mentee_id: user.id,
                 mentee_name: user.full_name || user.email?.split('@')?.[0] || 'Mentee',
                 mentor_id: mentorId,
@@ -116,7 +116,7 @@ const MentorsPage = () => {
  
         try {
             
-            await addDoc(collection(db, 'profiles', selectedMentor.id, 'sessions'), {
+            await addDoc(collection(db, 'sessions'), {
                 mentor_id: selectedMentor.id,
                 mentor_name: selectedMentor.name,
                 mentee_id: user.id,

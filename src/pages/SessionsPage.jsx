@@ -4,7 +4,7 @@ import { Card } from '../components/dashboard/DashboardWidgets';
 import { Button } from "@/components/ui/button";
 import AddSessionModal from '../components/dashboard/AddSessionModal';
 import { db } from '../lib/firebase';
-import { collectionGroup, getDocs, query, or, where } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, query, or, where } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 
 const SessionsPage = () => {
@@ -22,7 +22,7 @@ const SessionsPage = () => {
             setIsLoading(true);
             try {
                     const q = query(
-                        collectionGroup(db, 'sessions'),
+                        collection(db, 'sessions'),
                         or(
                             where('mentor_id', '==', user.id),
                             where('mentee_id', '==', user.id),

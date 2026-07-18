@@ -48,25 +48,34 @@ export default function ResourcesPage() {
                 const mentorIds = new Set();
 
                 // 1. Check requests collection
-                const reqQ = query(collectionGroup(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
+                const reqQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id));
                 const reqSnap = await getDocs(reqQ);
-                reqSnap.forEach(d => mentorIds.add(d.data().mentor_id));
+                reqSnap.forEach(d => {
+                    const data = d.data();
+                    if (data.status === 'accepted') mentorIds.add(data.mentor_id);
+                });
 
                 // 2. Check sessions collection (mentees might be connected via accepted sessions)
-                const sessQ = query(collectionGroup(db, 'sessions'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
+                const sessQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id));
                 const sessSnap = await getDocs(sessQ);
-                sessSnap.forEach(d => mentorIds.add(d.data().mentor_id));
+                sessSnap.forEach(d => {
+                    const data = d.data();
+                    if (data.status === 'accepted') mentorIds.add(data.mentor_id);
+                });
                 
                 // Fallback for older sessions that used 'booked_by' instead of 'mentee_id'
-                const legacySessQ = query(collectionGroup(db, 'sessions'), where('booked_by', '==', user.id), where('status', '==', 'accepted'));
+                const legacySessQ = query(collection(db, 'sessions'), where('booked_by', '==', user.id));
                 const legacySessSnap = await getDocs(legacySessQ);
-                legacySessSnap.forEach(d => mentorIds.add(d.data().mentor_id));
+                legacySessSnap.forEach(d => {
+                    const data = d.data();
+                    if (data.status === 'accepted') mentorIds.add(data.mentor_id);
+                });
 
                 const uniqueMentorIds = Array.from(mentorIds);
 
                 if (uniqueMentorIds.length > 0) {
                     const q = query(
-                        collectionGroup(db, 'resources'),
+                        collection(db, 'resources'),
                         where('mentor_id', 'in', uniqueMentorIds.slice(0, 30)) // Firestore 'in' max 30
                     );
                     const snapshot = await getDocs(q);

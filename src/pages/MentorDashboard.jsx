@@ -45,7 +45,7 @@ const MentorDashboard = () => {
 
     const handleRejectSession = async (sessionId) => {
         try {
-            await deleteDoc(doc(db, 'profiles', user.id, 'sessions', sessionId));
+            await deleteDoc(doc(db, 'sessions', sessionId));
             setSessionRequestsList(prev => prev.filter(s => s.id !== sessionId));
         } catch (err) { console.error("Error rejecting session:", err); }
     };
@@ -53,14 +53,14 @@ const MentorDashboard = () => {
     const handleCancelSession = async (sessionId) => {
         if (!window.confirm("Are you sure you want to cancel this session?")) return;
         try {
-            await deleteDoc(doc(db, 'profiles', user.id, 'sessions', sessionId));
+            await deleteDoc(doc(db, 'sessions', sessionId));
             setUpcomingSessions(prev => prev.filter(s => s.id !== sessionId));
         } catch (err) { console.error("Error cancelling session:", err); }
     };
 
     const handleAcceptRequest = async (reqId) => {
         try {
-            await updateDoc(doc(db, 'profiles', user.id, 'requests', reqId), { status: 'accepted' });
+            await updateDoc(doc(db, 'requests', reqId), { status: 'accepted' });
             setRequestsList(prev => prev.filter(r => r.id !== reqId));
             setMentorStats(prev => ({ ...prev, totalMentees: prev.totalMentees + 1 }));
         } catch (err) { console.error("Error accepting request:", err); }
@@ -68,7 +68,7 @@ const MentorDashboard = () => {
 
     const handleDeclineRequest = async (reqId) => {
         try {
-            await updateDoc(doc(db, 'profiles', user.id, 'requests', reqId), { status: 'declined' });
+            await updateDoc(doc(db, 'requests', reqId), { status: 'declined' });
             setRequestsList(prev => prev.filter(r => r.id !== reqId));
         } catch (err) { console.error("Error declining request:", err); }
     };
@@ -77,77 +77,72 @@ const MentorDashboard = () => {
         if (!user?.id) return;
         const fetchDashboardData = async () => {
             try {
-                // Fetch pending requests
-                const reqQ = query(collection(db, 'profiles', user.id, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
+                // Fetch pending & accepted requests
+                const reqQ = query(collection(db, 'requests'), where('mentor_id', '==', user.id));
                 const reqSnap = await getDocs(reqQ);
                 const rList = [];
+                let menteesCount = 0;
                 for (const r of reqSnap.docs) {
                     const data = r.data();
-                    const profileDoc = await getDoc(doc(db, 'profiles', data.mentee_id));
-                    if (profileDoc.exists()) {
-                        const p = profileDoc.data();
-                        rList.push({
-                           id: r.id,
-                           name: p.full_name || p.email?.split('@')?.[0] || 'Mentee',
-                           role: p.profile_data?.currentRole || 'Mentee',
-                           message: data.message || "Hi, I'd like to connect!",
-                           profile: {
-                               ...p,
-                               email: p.email || '',
-                               full_name: p.full_name || p.email?.split('@')[0] || 'Mentee',
-                               id: data.mentee_id
-                           }
-                        });
+                    if (data.status === 'pending') {
+                        const profileDoc = await getDoc(doc(db, 'profiles', data.mentee_id));
+                        if (profileDoc.exists()) {
+                            const p = profileDoc.data();
+                            rList.push({
+                               id: r.id,
+                               name: p.full_name || p.email?.split('@')?.[0] || 'Mentee',
+                               role: p.profile_data?.currentRole || 'Mentee',
+                               message: data.message || "Hi, I'd like to connect!",
+                               profile: {
+                                   ...p,
+                                   email: p.email || '',
+                                   full_name: p.full_name || p.email?.split('@')[0] || 'Mentee',
+                                   id: data.mentee_id
+                               }
+                            });
+                        }
+                    } else if (data.status === 'accepted') {
+                        menteesCount++;
                     }
                 }
                 setRequestsList(rList);
 
-                // Fetch pending session requests
-                const sessReqQ = query(collection(db, 'profiles', user.id, 'sessions'), where('mentor_id', '==', user.id), where('status', '==', 'pending'));
-                const sessReqSnap = await getDocs(sessReqQ);
-                const sList = [];
-                for (const d of sessReqSnap.docs) {
-                    const sData = d.data();
-                    const profileDoc = await getDoc(doc(db, 'profiles', sData.mentee_id));
-                    const p = profileDoc.exists() ? profileDoc.data() : {};
-                    sList.push({
-                        id: d.id,
-                        ...sData,
-                        profile: {
-                            ...p,
-                            email: p.email || '',
-                            full_name: p.full_name || sData.mentee_name || 'Mentee',
-                            id: sData.mentee_id
-                        }
-                    });
-                }
-                setSessionRequestsList(sList);
-
-                // Fetch stats (accepted requests + sessions)
-                const accQ = query(collection(db, 'profiles', user.id, 'requests'), where('mentor_id', '==', user.id), where('status', '==', 'accepted'));
-                const accSnap = await getDocs(accQ);
-                
-                const sessionQ = query(collection(db, 'profiles', user.id, 'sessions'), where('mentor_id', '==', user.id));
+                // Fetch session requests & sessions
+                const sessionQ = query(collection(db, 'sessions'), where('mentor_id', '==', user.id));
                 const sessionSnap = await getDocs(sessionQ);
-                
+                const sList = [];
                 let hours = 0;
-                let menteesCount = accSnap.docs.length;
                 const monthlyData = {};
-                
-                sessionSnap.docs.forEach(d => {
-                    const s = d.data();
-                    if (s.mentee_id && s.status !== 'pending') {
-                        const dur = (s.duration_minutes || 60) / 60;
+
+                for (const d of sessionSnap.docs) {
+                    const sData = d.data();
+                    if (sData.status === 'pending') {
+                        const profileDoc = await getDoc(doc(db, 'profiles', sData.mentee_id));
+                        const p = profileDoc.exists() ? profileDoc.data() : {};
+                        sList.push({
+                            id: d.id,
+                            ...sData,
+                            profile: {
+                                ...p,
+                                email: p.email || '',
+                                full_name: p.full_name || sData.mentee_name || 'Mentee',
+                                id: sData.mentee_id
+                            }
+                        });
+                    }
+                    if (sData.mentee_id && sData.status !== 'pending') {
+                        const dur = (sData.duration_minutes || 60) / 60;
                         hours += dur;
                         
-                        if (s.start_time) {
-                            const date = new Date(s.start_time);
+                        if (sData.start_time) {
+                            const date = new Date(sData.start_time);
                             const month = date.toLocaleString('default', { month: 'short' });
                             monthlyData[month] = (monthlyData[month] || 0) + dur;
                         }
                     }
-                });
-
+                }
+                setSessionRequestsList(sList);
+                
                 const cData = [];
                 for (let i = 5; i >= 0; i--) {
                     const d = new Date();
@@ -191,7 +186,7 @@ const MentorDashboard = () => {
         const fetchSessions = async () => {
             try {
                 const q = query(
-                    collection(db, 'profiles', user.id, 'sessions'),
+                    collection(db, 'sessions'),
                     where('mentor_id', '==', user.id)
                 );
                 const snapshot = await getDocs(q);

@@ -102,7 +102,7 @@ export default function MenteeDashboard() {
     const fetchDashboardData = async () => {
       try {
         // 1. Fetch all sessions for the user
-        const sessionsQ = query(collectionGroup(db, 'sessions'), where('mentee_id', '==', user.id));
+        const sessionsQ = query(collection(db, 'sessions'), where('mentee_id', '==', user.id));
         const sessionsSnap = await getDocs(sessionsQ);
         const allSessions = sessionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -126,10 +126,15 @@ export default function MenteeDashboard() {
         }));
 
         // 2. Fetch mentors (from accepted requests and all sessions)
-        const reqQ = query(collectionGroup(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'accepted'));
+        const reqQ = query(collection(db, 'requests'), where('mentee_id', '==', user.id));
         const reqSnap = await getDocs(reqQ);
         const mentorIds = new Set();
-        reqSnap.forEach(d => mentorIds.add(d.data().mentor_id));
+        let pCount = 0;
+        reqSnap.forEach(d => {
+            const data = d.data();
+            if (data.status === 'accepted') mentorIds.add(data.mentor_id);
+            else if (data.status === 'pending') pCount++;
+        });
         allSessions.forEach(s => {
             if (s.mentor_id) {
                 mentorIds.add(s.mentor_id);
@@ -156,10 +161,8 @@ export default function MenteeDashboard() {
         }
         setMentorsList(mList);
 
-        // Fetch pending requests
-        const pendingQ = query(collectionGroup(db, 'requests'), where('mentee_id', '==', user.id), where('status', '==', 'pending'));
-        const pendingSnap = await getDocs(pendingQ);
-        setPendingRequestsCount(pendingSnap.docs.length);
+        // Fetch pending requests count (already calculated above)
+        setPendingRequestsCount(pCount);
 
         // 3. Fetch Resources (only from connected mentors)
         if (mentorIds.size > 0) {
