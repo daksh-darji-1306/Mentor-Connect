@@ -168,7 +168,7 @@ export default function MenteeDashboard() {
         if (mentorIds.size > 0) {
             const uniqueMentorIds = Array.from(mentorIds);
             const resQ = query(
-                collectionGroup(db, 'resources'),
+                collection(db, 'resources'),
                 where('mentor_id', 'in', uniqueMentorIds.slice(0, 30))
             );
             const resSnap = await getDocs(resQ);

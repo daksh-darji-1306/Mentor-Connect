@@ -32,7 +32,8 @@ export default function ResourcesPage() {
             if (user.role === 'mentor') {
                 // Mentor sees their own resources
                 const q = query(
-                    collection(db, 'profiles', user.id, 'resources')
+                    collection(db, 'resources'),
+                    where('mentor_id', '==', user.id)
                 );
                 const snapshot = await getDocs(q);
                 const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
