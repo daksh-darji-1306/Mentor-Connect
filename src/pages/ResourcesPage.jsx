@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, collectionGroup, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import { BookOpen, Video, FileText, Link as LinkIcon, Plus, ExternalLink, Search } from 'lucide-react';
@@ -101,6 +101,17 @@ export default function ResourcesPage() {
     useEffect(() => {
         fetchResources();
     }, [user?.id, user?.role]);
+
+    const handleDeleteResource = async (resourceId) => {
+        if (!window.confirm("Are you sure you want to delete this resource?")) return;
+        try {
+            await deleteDoc(doc(db, 'resources', resourceId));
+            setResources(prev => prev.filter(r => r.id !== resourceId));
+        } catch (error) {
+            console.error("Error deleting resource:", error);
+            alert("Failed to delete resource");
+        }
+    };
 
     const filteredResources = resources.filter(r => 
         (r.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -204,15 +215,32 @@ export default function ResourcesPage() {
                                         </span>
                                     </div>
                                     
-                                    <a 
-                                        href={resource.url} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        onClick={() => logActivity(user?.id, 'resource_viewed')}
-                                        className="text-xs font-semibold text-primary flex items-center hover:underline"
-                                    >
-                                        View <ExternalLink className="w-3 h-3 ml-1" />
-                                    </a>
+                                    <div className="flex items-center gap-3">
+                                        {user?.role === 'mentor' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleDeleteResource(resource.id);
+                                                }}
+                                                className="text-xs font-semibold text-destructive hover:underline"
+                                            >
+                                                Delete
+                                            </button>
+                                        )}
+                                        <a 
+                                            href={resource.url} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                logActivity(user?.id, 'resource_viewed');
+                                            }}
+                                            className="text-xs font-semibold text-primary flex items-center hover:underline"
+                                        >
+                                            View <ExternalLink className="w-3 h-3 ml-1" />
+                                        </a>
+                                    </div>
                                 </div>
                             </Card>
                         </motion.div>
