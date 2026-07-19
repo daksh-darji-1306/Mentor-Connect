@@ -7,6 +7,12 @@ export default {
     ],
     theme: {
         extend: {
+            fontFamily: {
+                sans: ['Inter', 'system-ui', 'sans-serif'],
+                serif: ['Playfair Display', 'Georgia', 'serif'],
+                heading: ['Playfair Display', 'Georgia', 'serif'],
+                body: ['Inter', 'system-ui', 'sans-serif'],
+            },
             colors: {
                 border: "hsl(var(--border) / <alpha-value>)",
                 input: "hsl(var(--input) / <alpha-value>)",
@@ -41,17 +47,23 @@ export default {
                     DEFAULT: "hsl(var(--card) / <alpha-value>)",
                     foreground: "hsl(var(--card-foreground) / <alpha-value>)",
                 },
-                // Refined Purple Dashboard Theme
+                gold: {
+                    DEFAULT: "hsl(var(--gold) / <alpha-value>)",
+                    light: "hsl(var(--gold-light) / <alpha-value>)",
+                    dark: "hsl(var(--gold-dark) / <alpha-value>)",
+                },
+                // Dashboard Theme
                 dashboard: {
-                    bg: "#0f172a", // Slate 900
-                    card: "#1e293b", // Slate 800
-                    cardHover: "#334155", // Slate 700
-                    text: "#f8fafc", // Slate 50
-                    textMuted: "#94a3b8", // Slate 400
-                    accent: "#6366f1", // Indigo 500
-                    accentHover: "#4f46e5", // Indigo 600
-                    accentGlow: "#818cf8", // Indigo 400
-                    border: "#334155", // Slate 700
+                    bg: "#080B14",
+                    card: "#0E1220",
+                    cardHover: "#141826",
+                    text: "#EEF0F6",
+                    textMuted: "#6B7290",
+                    accent: "#A889FF",
+                    accentHover: "#9370F0",
+                    accentGlow: "#C4ACFF",
+                    border: "#1C2035",
+                    gold: "#C9A84C",
                 }
             },
             borderRadius: {

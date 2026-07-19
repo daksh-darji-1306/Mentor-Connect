@@ -79,7 +79,7 @@ const TopNavigation = () => {
                 {/* Right: Actions & Profile */}
                 <div className="flex items-center gap-4">
                     <div className="relative hidden sm:block">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <input
                             type="text"
                             placeholder="Search..."
@@ -88,8 +88,8 @@ const TopNavigation = () => {
                     </div>
 
 
-                    <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
-                        <Bell className="w-5 h-5" />
+                    <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground focus:ring-2 focus:ring-amber-200">
+                        <Bell aria-hidden="true" className="w-5 h-5" />
                     </Button>
 
                     <div className="h-4 w-px bg-border/50 hidden md:block"></div>
@@ -97,7 +97,7 @@ const TopNavigation = () => {
                     <div className="relative" ref={profileMenuRef}>
                         <button 
                             onClick={() => !isLoggingOut && setShowProfileMenu(!showProfileMenu)}
-                            className={`flex items-center gap-2 pl-2 rounded-full hover:bg-secondary/30 transition-colors p-1 pr-3 border border-transparent hover:border-border/30 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`flex items-center gap-2 pl-2 rounded-full hover:bg-secondary/30 transition-colors duration-200 p-1 pr-3 border border-transparent hover:border-border/30 focus:outline-none focus:ring-2 focus:ring-amber-200 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-violet-400 flex items-center justify-center text-primary-foreground text-xs font-bold uppercase overflow-hidden">
                                 {user?.avatar_url ? (
@@ -117,23 +117,23 @@ const TopNavigation = () => {
                                 </div>
                                 <button
                                     onClick={() => handleNavigate('/profile')}
-                                    className="w-full text-left px-4 py-2 text-sm hover:bg-secondary/50 flex items-center gap-2 transition-colors"
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-secondary/50 flex items-center gap-2 transition-colors duration-200 focus:outline-none focus:bg-secondary/50"
                                 >
-                                    <User className="w-4 h-4" /> Profile
+                                    <User aria-hidden="true" className="w-4 h-4" /> Profile
                                 </button>
                                 <button
                                     onClick={() => handleNavigate('/settings')}
-                                    className="w-full text-left px-4 py-2 text-sm hover:bg-secondary/50 flex items-center gap-2 transition-colors"
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-secondary/50 flex items-center gap-2 transition-colors duration-200 focus:outline-none focus:bg-secondary/50"
                                 >
-                                    <Settings className="w-4 h-4" /> Settings
+                                    <Settings aria-hidden="true" className="w-4 h-4" /> Settings
                                 </button>
                                 <div className="h-px bg-border/50 my-1"></div>
                                 <button 
                                     onClick={handleLogout}
                                     disabled={isLoggingOut}
-                                    className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors disabled:opacity-50"
+                                    className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors duration-200 focus:outline-none focus:bg-destructive/10 disabled:opacity-50"
                                 >
-                                    <LogOut className="w-4 h-4" /> {isLoggingOut ? 'Logging out...' : 'Log out'}
+                                    <LogOut aria-hidden="true" className="w-4 h-4" /> {isLoggingOut ? 'Logging out...' : 'Log out'}
                                 </button>
                             </div>
                         )}
